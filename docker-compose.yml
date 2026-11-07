@@ -1,0 +1,28 @@
+# 로컬 개발용 PostgreSQL + PostGIS
+#   cp .env.example .env   # 값을 채운 뒤
+#   docker compose up -d
+#
+# 포트 기본값은 5433 이다. 호스트에 이미 PostgreSQL 이 5432 를 쓰고 있어도 충돌하지 않는다.
+# 같은 서버에 테스트용 DB(<DB_NAME>_test)도 함께 만든다 (docker/initdb/01-create-test-db.sh).
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: ${COMPOSE_PROJECT_NAME:-flatmap}-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:?DB_NAME 이 필요합니다 (.env 확인)}
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME 이 필요합니다 (.env 확인)}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD 가 필요합니다 (.env 확인)}
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - flatmap_pgdata:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  flatmap_pgdata:
