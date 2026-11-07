@@ -42,8 +42,7 @@ class AdminEndpointSecurityTest {
     static Stream<Arguments> adminEndpoints() {
         return Stream.of(
                 Arguments.of(HttpMethod.POST, "/api/safety/fetch/all"),
-                Arguments.of(HttpMethod.POST, "/api/safety/fetch/cctv"),
-                Arguments.of(HttpMethod.POST, "/api/safety/fetch/security-lights"),
+                Arguments.of(HttpMethod.POST, "/api/safety/facilities/sync"),
                 Arguments.of(HttpMethod.POST, "/api/safety/fetch/accident-zones"),
                 Arguments.of(HttpMethod.POST, "/api/safety/fetch/protected-zones"),
                 Arguments.of(HttpMethod.POST, "/api/safety/fetch/welfare-facilities"),

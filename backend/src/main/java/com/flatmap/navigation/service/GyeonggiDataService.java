@@ -6,9 +6,7 @@ import com.flatmap.navigation.config.ApiKeyConfig;
 import com.flatmap.navigation.entity.AccidentZone;
 import com.flatmap.navigation.entity.SeniorCenter;
 import com.flatmap.navigation.entity.SteepSlopeArea;
-import com.flatmap.navigation.model.SafetyFacility;
 import com.flatmap.navigation.repository.AccidentZoneRepository;
-import com.flatmap.navigation.repository.SafetyFacilityRepository;
 import com.flatmap.navigation.repository.SeniorCenterRepository;
 import com.flatmap.navigation.repository.SteepSlopeAreaRepository;
 import org.slf4j.Logger;
@@ -31,24 +29,18 @@ public class GyeonggiDataService {
     private final ApiKeyConfig apiKeyConfig;
     private final ObjectMapper objectMapper;
     private final SteepSlopeAreaRepository steepSlopeAreaRepository;
-    private final SafetyFacilityRepository safetyFacilityRepository;
     private final AccidentZoneRepository accidentZoneRepository;
     private final SeniorCenterRepository seniorCenterRepository;
-
-    /** safety_facility.data_source 값 (ASCII 고정 — 인코딩 문제로 출처 값이 깨졌던 SafetyRoad 덤프 교훈) */
-    static final String SECURITY_LIGHT_SOURCE = "GYEONGGI_DATADREAM_SECRTLGT";
 
     public GyeonggiDataService(RestTemplate restTemplate, ApiKeyConfig apiKeyConfig,
                                 ObjectMapper objectMapper,
                                 SteepSlopeAreaRepository steepSlopeAreaRepository,
-                                SafetyFacilityRepository safetyFacilityRepository,
                                 AccidentZoneRepository accidentZoneRepository,
                                 SeniorCenterRepository seniorCenterRepository) {
         this.restTemplate = restTemplate;
         this.apiKeyConfig = apiKeyConfig;
         this.objectMapper = objectMapper;
         this.steepSlopeAreaRepository = steepSlopeAreaRepository;
-        this.safetyFacilityRepository = safetyFacilityRepository;
         this.accidentZoneRepository = accidentZoneRepository;
         this.seniorCenterRepository = seniorCenterRepository;
     }
@@ -147,53 +139,7 @@ public class GyeonggiDataService {
         return new SteepSlopeArea(name, lat, lng, grade, "GYEONGGI", regionCode);
     }
 
-    // ============================================================
-    // 보안등 — SECRTLGT
-    // ============================================================
-
-    public int fetchAndSaveSecurityLights() {
-        log.info("=== 경기데이터드림 보안등(SECRTLGT) 데이터 수집 시작 ===");
-        List<SafetyFacility> all = new ArrayList<>();
-
-        try {
-            String raw = callGyeonggiApi("SECRTLGT", apiKeyConfig.getGyeonggiApiKey(), 1, 100);
-            if (raw == null || raw.trim().startsWith("<")) {
-                log.warn("[SECRTLGT] 유효한 응답 없음");
-                return 0;
-            }
-            JsonNode root = objectMapper.readTree(raw);
-            JsonNode rows = findRows(root);
-            if (rows != null) {
-                if (!rows.isEmpty()) log.info("[SECRTLGT] 첫 row: {}", rows.get(0));
-                for (JsonNode row : rows) {
-                    // TODO: 실제 응답 확인 후 필드명 조정 (INSTL_PL_CD, INST_NM, SECRTLGT_NM 등)
-                    String name = getFieldValue(row, "INST_NM", "INSTL_PL_CD", "SECRTLGT_NM", "NM", "MANAGE_NM");
-                    Double lat = getFieldDouble(row, "REFINE_WGS84_LAT", "LAT");
-                    Double lng = getFieldDouble(row, "REFINE_WGS84_LOGT", "LNG", "LOT");
-                    String addr = getFieldValue(row, "REFINE_ROADNM_ADDR", "REFINE_LOTNO_ADDR", "ADDR");
-                    String regionCode = getFieldValue(row, "SIGUN_CD", "SIGUN_NM");
-                    // 이 API 는 경기도 전체를 반환한다. 성남시가 아닌 행은 적재하지 않는다
-                    // (이전 FlatMap 덤프의 security_lights 100건이 가평군 데이터였던 원인).
-                    if (addr == null || !addr.contains("성남시")) continue;
-                    if (lat != null && lng != null) {
-                        if (name == null) name = "보안등";
-                        all.add(new SafetyFacility(SafetyFacility.TYPE_SECURITY_LIGHT, name, addr, regionCode,
-                                lat, lng, SECURITY_LIGHT_SOURCE));
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("[SECRTLGT] 데이터 수집 실패: {}", e.getMessage());
-        }
-
-        if (!all.isEmpty()) {
-            int inserted = safetyFacilityRepository.replaceAll(
-                    SafetyFacility.TYPE_SECURITY_LIGHT, SECURITY_LIGHT_SOURCE, all);
-            log.info("[SECRTLGT] 보안등 {}건 조회, {}건 저장 (중복 좌표 제외)", all.size(), inserted);
-            return inserted;
-        }
-        return 0;
-    }
+    // 보안등(SECRTLGT) 수집은 ingestion 패키지(FacilityIngestionService)로 옮겼다 — 01 단계.
 
     // ============================================================
     // 사고다발지 — IceTfcacdar (결빙) + TfcacdarM (일반)
