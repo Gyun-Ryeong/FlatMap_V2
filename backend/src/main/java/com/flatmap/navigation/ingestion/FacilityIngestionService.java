@@ -72,8 +72,11 @@ public class FacilityIngestionService {
                     reading.facilities().size() - inserted);
             return SourceResult.success(source, reading, inserted);
         } catch (Exception e) {
-            // 메시지는 우리가 만든 IngestionException 만 남긴다. 그 외 예외 메시지에는 URL·SQL 이 섞일 수 있다.
-            String reason = e instanceof IngestionException ? e.getMessage() : e.getClass().getSimpleName();
+            // 메시지는 우리가 만든 IngestionException 과, JdkIngestionHttp 가 만든 IOException("HTTP 401" 등,
+            // URL 을 담지 않음)만 남긴다. 그 외 예외 메시지에는 URL·SQL 이 섞일 수 있어 클래스 이름만 남긴다.
+            String reason = e instanceof IngestionException || e instanceof java.io.IOException
+                    && e.getClass() == java.io.IOException.class
+                    ? e.getMessage() : e.getClass().getSimpleName();
             log.error("[ingestion][{}] 동기화 실패 — {}", code, reason);
             return SourceResult.failed(source);
         }
