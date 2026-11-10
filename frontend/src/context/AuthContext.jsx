@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
 
   const login = () => {
     // 전체 페이지 이동은 CRA 개발서버 프록시를 타지 않으므로 백엔드 절대 주소로 직접 이동
-    const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8080';
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
     window.location.href = `${backendUrl}/api/auth/kakao/login`;
   };
 
