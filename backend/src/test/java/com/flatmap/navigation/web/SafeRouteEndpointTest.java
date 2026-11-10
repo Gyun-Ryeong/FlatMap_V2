@@ -42,6 +42,7 @@ class SafeRouteEndpointTest {
     @AfterEach
     void clean() {
         jdbc.update("DELETE FROM safety_facility");
+        jdbc.update("DELETE FROM steep_slope_areas");
         Mockito.reset(tmap, weatherService);
         // 기본은 기상 API 실패(대체값) — C축 없이 A축만 반영된다. 날씨가 필요한 테스트는 다시 지정한다.
         Mockito.when(weatherService.getWeather(Mockito.anyDouble(), Mockito.anyDouble()))
@@ -104,6 +105,40 @@ class SafeRouteEndpointTest {
                 // 같은 점수의 두 후보는 소요 시간이 짧은 쪽이 추천
                 .andExpect(jsonPath("$.routes[0].recommended").value(false))
                 .andExpect(jsonPath("$.routes[1].recommended").value(true));
+    }
+
+    @Test
+    void eachRouteCarriesSteepSlopeWarningsWithoutRiskLevelAndWithoutAffectingTheScore() throws Exception {
+        Mockito.when(tmap.getCandidateRoutes(Mockito.anyDouble(), Mockito.anyDouble(),
+                Mockito.anyDouble(), Mockito.anyDouble())).thenReturn(List.of(candidate(0, "일반", 800)));
+
+        // 급경사지 없음 → 빈 배열(필드는 항상 있다)
+        mvc.perform(get("/api/routes/safe" + QUERY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.routes[0].riskSections.length()").value(0));
+        double scoreWithout = scoreOfFirstRoute();
+
+        // 경로(경도 127.1000)에서 약 90m 떨어진 붕괴위험 지정지 + 먼 곳 하나
+        jdbc.update("INSERT INTO steep_slope_areas (name, grade, source, region_code, geom) " +
+                "VALUES (?, ?, ?, ?, ST_SetSRID(ST_MakePoint(?, ?), 4326))", "근처 급경사지", 12.5, "TEST", "41135", 127.1010, 37.4050);
+        jdbc.update("INSERT INTO steep_slope_areas (name, grade, source, region_code, geom) " +
+                "VALUES (?, ?, ?, ?, ST_SetSRID(ST_MakePoint(?, ?), 4326))", "먼 급경사지", null, "TEST", "41135", 127.2000, 37.5000);
+
+        mvc.perform(get("/api/routes/safe" + QUERY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.routes[0].riskSections.length()").value(1))
+                .andExpect(jsonPath("$.routes[0].riskSections[0].name").value("근처 급경사지"))
+                .andExpect(jsonPath("$.routes[0].riskSections[0].grade").value(12.5))
+                .andExpect(jsonPath("$.routes[0].riskSections[0].nearestRouteIdx").isNumber())
+                .andExpect(jsonPath("$.routes[0].riskSections[0].distanceFromRoute").isNumber())
+                .andExpect(jsonPath("$.routes[0].riskSections[0].riskLevel").doesNotExist());
+        // 급경사지는 점수에 섞지 않는다
+        org.assertj.core.api.Assertions.assertThat(scoreOfFirstRoute()).isEqualTo(scoreWithout);
+    }
+
+    private double scoreOfFirstRoute() throws Exception {
+        String body = mvc.perform(get("/api/routes/safe" + QUERY)).andReturn().getResponse().getContentAsString();
+        return com.jayway.jsonpath.JsonPath.<Number>read(body, "$.routes[0].totalScore").doubleValue();
     }
 
     @Test

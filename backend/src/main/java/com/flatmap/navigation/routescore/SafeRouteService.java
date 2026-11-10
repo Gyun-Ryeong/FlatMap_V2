@@ -3,6 +3,7 @@ package com.flatmap.navigation.routescore;
 import com.flatmap.navigation.dto.RouteResponse;
 import com.flatmap.navigation.dto.WeatherInfo;
 import com.flatmap.navigation.repository.SafetyFacilityRepository;
+import com.flatmap.navigation.service.SteepSlopeService;
 import com.flatmap.navigation.service.TMapRouteService;
 import com.flatmap.navigation.service.WeatherService;
 import org.slf4j.Logger;
@@ -16,7 +17,7 @@ import java.util.UUID;
 
 /**
  * 후보 경로 3종을 받아 경로마다 A축(야간 시설 노출)과 C축(날씨 보정) 점수를 매긴다.
- * 경로 하나당 시설 집계 쿼리는 정확히 한 번이다(샘플 점마다 묻지 않는다). 날씨는 격자 캐시를 거치므로
+ * 경로 하나당 시설 집계 쿼리는 정확히 한 번이다(급경사지 경고 구간 조회는 별도 한 번이며 점수에 섞지 않는다)(샘플 점마다 묻지 않는다). 날씨는 격자 캐시를 거치므로
  * 같은 격자의 후보끼리는 외부 호출이 한 번이다. 날씨를 얻지 못하면(fallback) C축 없이 A축만으로 점수를 낸다.
  */
 @Service
@@ -29,14 +30,17 @@ public class SafeRouteService {
     private final RouteScorer scorer;
     private final ScoreModel model;
     private final WeatherService weatherService;
+    private final SteepSlopeService steepSlopeService;
 
     public SafeRouteService(TMapRouteService tmap, SafetyFacilityRepository facilities,
-                            RouteScorer scorer, ScoreModel model, WeatherService weatherService) {
+                            RouteScorer scorer, ScoreModel model, WeatherService weatherService,
+                            SteepSlopeService steepSlopeService) {
         this.tmap = tmap;
         this.facilities = facilities;
         this.scorer = scorer;
         this.model = model;
         this.weatherService = weatherService;
+        this.steepSlopeService = steepSlopeService;
     }
 
     /** 경로 하나의 평가 결과: 점수(축별 내역 포함), 시설 집계, 점수에 쓴 날씨. */
@@ -93,6 +97,7 @@ public class SafeRouteService {
                 (int) exposure.cctvCount(),
                 (int) exposure.lightCount(),
                 (int) exposure.policeCount(),
+                steepSlopeService.findRiskSections(route.getCoords()),
                 evaluation.weather(),
                 false);
     }

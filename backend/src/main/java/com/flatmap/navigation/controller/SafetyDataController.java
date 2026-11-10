@@ -71,6 +71,65 @@ public class SafetyDataController {
         return ResponseEntity.ok(safetyFacilityRepository.findByType(SafetyFacility.TYPE_SECURITY_LIGHT));
     }
 
+    // ========== 지도 영역 시설 조회 (CCTV·보안등·경찰시설) ==========
+
+    static final int DEFAULT_FACILITY_LIMIT = 500;
+    static final int MAX_FACILITY_LIMIT = 2000;
+    private static final List<String> FACILITY_TYPES = List.of(
+            SafetyFacility.TYPE_CCTV, SafetyFacility.TYPE_SECURITY_LIGHT, SafetyFacility.TYPE_POLICE);
+
+    /**
+     * 지도 뷰포트 안의 시설. type 은 쉼표로 여러 개(CCTV,SECURITY_LIGHT,POLICE), 생략하면 세 종류 모두.
+     * limit 개를 넘으면 앞에서 limit 개만 주고 truncated=true 로 알린다(전체 보안등은 수십만 건이다).
+     */
+    @GetMapping("/facilities")
+    public ResponseEntity<Map<String, Object>> getFacilitiesInBounds(
+            @RequestParam double minLat,
+            @RequestParam double minLng,
+            @RequestParam double maxLat,
+            @RequestParam double maxLng,
+            @RequestParam(required = false) String type,
+            @RequestParam(defaultValue = "" + DEFAULT_FACILITY_LIMIT) int limit) {
+
+        if (!(minLat < maxLat) || !(minLng < maxLng)) {
+            return ApiErrors.body(HttpStatus.BAD_REQUEST, "INVALID_BOUNDS", "조회 범위가 올바르지 않습니다.");
+        }
+        if (limit < 1 || limit > MAX_FACILITY_LIMIT) {
+            return ApiErrors.body(HttpStatus.BAD_REQUEST, "INVALID_LIMIT",
+                    "limit 은 1 이상 " + MAX_FACILITY_LIMIT + " 이하여야 합니다.");
+        }
+        List<String> types = new ArrayList<>();
+        if (type == null || type.isBlank()) {
+            types.addAll(FACILITY_TYPES);
+        } else {
+            for (String t : type.split(",")) {
+                String name = t.trim().toUpperCase();
+                if (!FACILITY_TYPES.contains(name)) {
+                    return ApiErrors.body(HttpStatus.BAD_REQUEST, "INVALID_FACILITY_TYPE", "지원하지 않는 시설 종류입니다.");
+                }
+                if (!types.contains(name)) types.add(name);
+            }
+        }
+
+        List<SafetyFacility> found = safetyFacilityRepository.findInBounds(types, minLat, minLng, maxLat, maxLng, limit + 1);
+        boolean truncated = found.size() > limit;
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (SafetyFacility f : truncated ? found.subList(0, limit) : found) {
+            Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("facilityType", f.getFacilityType());
+            item.put("name", f.getName());
+            item.put("latitude", f.getLatitude());
+            item.put("longitude", f.getLongitude());
+            items.add(item);
+        }
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("count", items.size());
+        body.put("limit", limit);
+        body.put("truncated", truncated);
+        body.put("facilities", items);
+        return ResponseEntity.ok(body);
+    }
+
     // ========== 사고다발지 ==========
 
     @GetMapping("/accident-zones")
