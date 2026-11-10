@@ -2,6 +2,33 @@
 
 > 단계 번호: 아래 "1단계 — 통합 스키마…" 는 로드맵의 00(foundation) 이다. 로드맵 01(ingestion)은 이 문서 맨 위 항목이다.
 
+## 03 단계 — 경로 점수 + 시설 밀도 격자 (route-score) (2026-11-10) — 구현·자동 테스트 완료
+
+후보 경로 3종에 A축(야간 시설 노출) 점수를 매기고, 시설 밀도 격자를 재계산·조회할 수 있게 했다.
+**점수는 검증되지 않은 설계 파라미터이며 위험도·안전도가 아니다.** 지금은 A축만 반영한다(보행난이도 B·날씨 C는 이후 단계, 아직 반영하지 않는다).
+
+### 추가됨
+
+- `GET /api/routes/safe?startLat&startLng&endLat&endLng` — T Map 후보 경로 3종(`searchOption` 0 일반 / 4 대로우선 / 10 최단)을 받아 경로별 `totalScore`, 축별 `breakdown`, 주변 `cctvCount`·`lightCount`·`policeCount` 를 돌려준다. 총점이 가장 높은 경로에 `recommended` 표시. 응답의 `scoreModel` 에 설계 파라미터 안내 문구가 들어 있다. 후보 하나가 실패해도 나머지로 응답하고, 모두 실패하면 일반화된 502.
+- **A축 점수**: 경로 전체를 LINESTRING 하나로 만들어 **DB 쿼리 1회**(`ST_DWithin(geography)`, 미터)로 시설 수와 경로 길이를 구한다. 점수 = 구간 함수(가중 시설 수 ÷ 경로 km). 구간 함수는 `PiecewiseScale` 한 곳에만 있다.
+- **시설 밀도 격자**: 300m 격자(경도 0.0034° × 위도 0.0027°, 성남 범위), 정수 인덱스 `(grid_i, grid_j)`. `POST /api/density-grid/recalculate`(관리용, `X-Admin-Api-Key`)는 **단일 트랜잭션**으로 다시 만들고, 시설 0개이면서 인접 8칸에도 시설이 없는 셀은 저장하지 않는다. `GET /api/density-grid`(공개, 선택적 사각형 필터)로 조회. 등급은 `LOW_DENSITY / MEDIUM / HIGH_DENSITY`.
+- Flyway `V4`: `facility_density_grid` 에 `cctv_count / light_count / police_count` 추가. `facility_count` 는 가중치 없는 실제 개수다.
+- 설정값: `application.properties` 의 `score.*`(가중치·반경·구간 함수·격자 범위·등급 경계), `tmap.connect-timeout-ms`, `tmap.read-timeout-ms`. 코드에 기본값을 두지 않는다. 같은 이름의 환경변수로 덮어쓸 수 있다.
+
+### 변경됨
+
+- `TMapRouteService`: FlatMap 의 단일 경로 조회와 SafetyRoad 의 후보 3종 호출을 **하나로 합쳤다**. 기존 `/api/route/walk`, `/walk/detour` 동작은 그대로. T Map 호출에 연결·읽기 타임아웃을 추가했고, 로그·예외에 응답 본문을 남기지 않는다.
+- POLICE 가중: SafetyRoad 는 경찰을 ×5 로 의도했지만 격자 집계가 경찰을 한 번 더 세어 실제로는 ×6 이었다. 여기서는 의도한 5배를 설정값(`score.weight.police`)으로 명시하고 한 번만 센다.
+- 격자의 "danger_zone" 표현·`HIGH/LOW` 위험 등급은 쓰지 않는다. 시설 밀도가 낮다는 것은 위험이 아니라 시설 데이터가 적다는 뜻이다.
+
+### 한계 / 후속
+
+- 점수 구간·가중치는 검증되지 않은 값이다. 보안등 수집(`GG_SECURITY_LIGHT` 29만 건)이 아직 끝나지 않아 실제 적재 기준 보안등이 적게 잡힌다 — 점수가 시설 수집 상태에 따라 달라진다.
+- 개발 DB(flatmapv2)에는 V3·V4 가 아직 적용되지 않았다(앱 재시작 시 적용). 검증은 테스트 DB 에서 했고, 시설 밀도 격자는 개발 DB 에서 아직 한 번도 재계산하지 않았다.
+- 급경사지 경로 반경 판정(정점 기준)은 03 에서 재검토했으나 이번 범위 밖이라 유지했다.
+- 프론트는 아직 새 계약(`totalScore`, `breakdown`, `{routes, scoreModel}` 래퍼)을 쓰지 않는다. 05 단계에서 포팅한다.
+
+
 ## 02 단계 — 공간 로직 PostGIS 이전 (spatial-core) (2026-11-10) — 구현·자동 테스트 완료
 
 `findAll()` 후 애플리케이션에서 haversine 을 돌던 급경사지 로직을 DB 의 `ST_DWithin(geography)` 로 옮기고, 급경사지 API 를 "붕괴위험 경고 레이어" 계약으로 정리했다.
