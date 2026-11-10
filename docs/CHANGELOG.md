@@ -2,6 +2,30 @@
 
 > 단계 번호: 아래 "1단계 — 통합 스키마…" 는 로드맵의 00(foundation) 이다. 로드맵 01(ingestion)은 이 문서 맨 위 항목이다.
 
+## 02 단계 — 공간 로직 PostGIS 이전 (spatial-core) (2026-11-10) — 구현·자동 테스트 완료
+
+`findAll()` 후 애플리케이션에서 haversine 을 돌던 급경사지 로직을 DB 의 `ST_DWithin(geography)` 로 옮기고, 급경사지 API 를 "붕괴위험 경고 레이어" 계약으로 정리했다.
+
+### 변경됨
+
+- 경로 반경(200m) 이내 급경사지 판별(`findRiskSections`)을 **DB 쿼리 1회**로 교체했다. 결과(감지 대상·`nearestRouteIdx`·경로 순서 정렬)는 교체 전과 같고, 교체 전에 동작 고정 테스트를 먼저 썼다. 거리 값은 구면(haversine)→WGS84 타원체로 약 0.2% 이내 차이.
+- 우회 경유지 후보가 다른 급경사지 반경에 걸리는지 검증하는 부분(`DetourService`)을 **오프셋 단계마다 DB 쿼리 1회**로 교체했다. 우회 결과는 교체 전과 같다(테스트로 고정).
+- **급경사지 API 계약**: `riskLevel` 없이 경사도(°)·위치·출처만 반환한다. 경로 구간(`riskSections[]`)은 `lat, lng, name, grade, source, distanceFromRoute, nearestRouteIdx`. 측정되지 않은 `grade` 는 `0` 이 아니라 `null`.
+- `steep_slope_areas` 위치의 **쓰기 원본을 `geom` 으로 전환**(Flyway `V3`). `latitude/longitude` 는 geom 에서 파생되는 읽기 전용 컬럼이다. 수집 서비스 4곳과 `ElevationService`, 동기화/경사도 갱신 엔드포인트가 모두 geom 으로 쓴다. 기존 행의 좌표는 보존된다(테스트로 확인).
+- `SteepSlopeAreaRepository` 를 JPA → `JdbcTemplate` 로 바꿨다(공간 데이터 규칙). 출처별 교체(삭제+저장)는 이제 한 트랜잭션이다.
+
+### 제거됨 (호환성 영향)
+
+- **날씨 기반 급경사지 등급 보정**(`adjustRiskByWeather`)과 `RouteResponse.overallRisk`, `RiskSection.riskLevel`, `DetourRequest.avoidPoints[].riskLevel`. 급경사지에는 보행 위험등급이 없으므로 올릴 등급도, 그로부터 파생할 종합 위험도도 없다. 날씨는 응답의 `weather` 로 계속 내려간다. 점수에 반영하는 것은 04 단계(C축)에서 한다.
+- `/risk-stats` 는 00 단계에서 이미 사라졌고, 되살리지 않는 것으로 확정했다. (옛 클라이언트가 `avoidPoints[].riskLevel` 을 보내도 무시된다.)
+- **알려진 영향**: 현재 `frontend/`(CRA)는 `riskLevel`·`overallRisk` 를 읽는다. 05 단계에서 UI 를 새로 포팅하므로 그때 새 계약에 맞춘다. 그전까지 구 프론트의 위험 등급 배지는 의미 있는 값을 보여주지 못한다(00 단계부터 급경사지 등급이 `null` 이었다).
+
+### 한계 / 후속
+
+- 반경 판정은 기존과 같은 의미(경로 **정점**까지의 최소 거리)다. 선분 기준으로 바꾸면 정점 간격이 먼 경로에서 감지 대상이 늘 수 있어 03 단계(경로 점수)에서 재검토한다.
+- `DetourService` 에 `haversineMeters` 가 4곳 남아 있다. 모두 요청 안의 점끼리의 계산이며 DB 행을 `findAll()` 로 도는 곳은 없다(`docs/dev/DECISIONS.md` 참고).
+- 01 단계의 미해결 2개 소스(`ODCLOUD_SEONGNAM_CCTV` 401, `GG_SECURITY_LIGHT` 장시간)는 그대로다. 02 는 급경사지만 다룬다.
+
 ## 01 단계 — 성남시 안전시설 재수집 (ingestion) (2026-11-10) — 구현·자동 테스트 완료, 실제 적재 검증 4/6 소스
 
 깨진 덤프를 쓰지 않고 공공 소스에서 CCTV·보안등·경찰시설을 다시 수집해 `safety_facility` 에 적재한다.
