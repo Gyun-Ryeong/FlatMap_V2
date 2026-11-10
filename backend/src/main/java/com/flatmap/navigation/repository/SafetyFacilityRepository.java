@@ -1,6 +1,7 @@
 package com.flatmap.navigation.repository;
 
 import com.flatmap.navigation.model.SafetyFacility;
+import com.flatmap.navigation.routescore.RouteExposure;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -75,6 +76,25 @@ public class SafetyFacilityRepository {
                         "location::geography, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)",
                 Long.class, facilityType, lng, lat, meters);
         return n == null ? 0 : n;
+    }
+
+    /**
+     * 경로(WKT, 경도 위도 순) 주변 시설을 종류별로 센다 — <b>쿼리 한 번</b>.
+     * CCTV·보안등은 경로에서 {@code radiusMeters} 이내, 경찰시설은 {@code policeRadiusMeters} 이내만 센다.
+     * 경로 길이(m)도 같은 쿼리에서 계산한다. 샘플 점마다 묻지 않는다(N+1 금지, DECISIONS §2).
+     */
+    public RouteExposure countAlongRoute(String routeWkt, double radiusMeters, double policeRadiusMeters) {
+        return jdbc.queryForObject(
+                "WITH route AS (SELECT ST_GeogFromText(?) AS g) " +
+                "SELECT COUNT(*) FILTER (WHERE f.facility_type = 'CCTV'), " +
+                "       COUNT(*) FILTER (WHERE f.facility_type = 'SECURITY_LIGHT'), " +
+                "       COUNT(*) FILTER (WHERE f.facility_type = 'POLICE'), " +
+                "       MAX(ST_Length(r.g)) " +
+                "FROM route r LEFT JOIN safety_facility f ON " +
+                "  (f.facility_type IN ('CCTV', 'SECURITY_LIGHT') AND ST_DWithin(f.location::geography, r.g, ?)) " +
+                "  OR (f.facility_type = 'POLICE' AND ST_DWithin(f.location::geography, r.g, ?))",
+                (rs, i) -> new RouteExposure(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getDouble(4)),
+                routeWkt, radiusMeters, policeRadiusMeters);
     }
 
     public long countByDataSource(String dataSource) {
