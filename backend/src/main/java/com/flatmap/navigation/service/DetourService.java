@@ -53,11 +53,10 @@ public class DetourService {
         List<List<RiskSection>> clusters = clusterRiskSections(riskSections);
         log.info("위험구간 {}건 → {}개 군집으로 통합", riskSections.size(), clusters.size());
 
-        // 2단계: 군집을 위험도 높은 순으로 정렬해 상위 MAX_WAYPOINTS개만 사용, 이후 경로 순서로 재정렬
+        // 2단계: 급경사지에는 등급이 없으므로 우선순위를 매기지 않는다. 경로 순서대로 앞의 MAX_WAYPOINTS개 군집만 쓴다.
         List<List<RiskSection>> topClusters = clusters.stream()
-                .sorted(Comparator.comparingInt(this::clusterRiskRank))
-                .limit(MAX_WAYPOINTS)
                 .sorted(Comparator.comparingInt(this::clusterRouteIdx))
+                .limit(MAX_WAYPOINTS)
                 .collect(java.util.stream.Collectors.toList());
 
         StringBuilder passList = new StringBuilder();
@@ -135,25 +134,6 @@ public class DetourService {
             sumLng += rs.getLng();
         }
         return new double[]{sumLat / cluster.size(), sumLng / cluster.size()};
-    }
-
-    /** 군집의 대표 위험도 순위 (구성원 중 가장 높은 위험도 기준, 낮을수록 위험) */
-    private int clusterRiskRank(List<RiskSection> cluster) {
-        int best = Integer.MAX_VALUE;
-        for (RiskSection rs : cluster) {
-            best = Math.min(best, riskRank(rs.getRiskLevel()));
-        }
-        return best;
-    }
-
-    private int riskRank(String riskLevel) {
-        if (riskLevel == null) return 3;
-        switch (riskLevel) {
-            case "VERY_HIGH": return 0;
-            case "HIGH": return 1;
-            case "MEDIUM": return 2;
-            default: return 3;
-        }
     }
 
     /** 군집이 경로상 어디쯤인지 (구성원 nearestRouteIdx의 최솟값) */

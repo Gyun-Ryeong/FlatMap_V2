@@ -2,7 +2,6 @@ package com.flatmap.navigation.service;
 
 import com.flatmap.navigation.dto.RiskSection;
 import com.flatmap.navigation.dto.RouteResponse;
-import com.flatmap.navigation.dto.WeatherInfo;
 import com.flatmap.navigation.model.SteepSlopeArea;
 import com.flatmap.navigation.repository.SteepSlopeAreaRepository;
 import org.slf4j.Logger;
@@ -46,13 +45,13 @@ public class SteepSlopeService {
         List<RiskSection> riskSections = new ArrayList<>(hits.size());
         for (SteepSlopeAreaRepository.RouteHit hit : hits) {
             SteepSlopeArea area = hit.area();
+            // 붕괴위험 지정지에는 보행 위험등급이 없다. 경사도(°)는 측정되지 않았으면 null 로 둔다(0° 아님).
             riskSections.add(new RiskSection(
                     area.getLatitude(),
                     area.getLongitude(),
                     area.getName(),
-                    area.getGrade() != null ? area.getGrade() : 0.0,
-                    // 붕괴위험 지정지에는 보행 위험등급이 없다(null). 보행난이도는 경로 DEM 경사로 따로 계산한다.
-                    null,
+                    area.getGrade(),
+                    area.getSource(),
                     hit.distanceMeters(),
                     hit.nearestIdx()
             ));
@@ -71,53 +70,5 @@ public class SteepSlopeService {
      */
     public Set<Integer> pointsWithinRiskRadius(List<double[]> points) {
         return repository.findPointIndexesWithAreaWithin(points, RISK_RADIUS_METERS);
-    }
-
-    /**
-     * 날씨 조건에 따라 위험구간의 riskLevel을 보정한다.
-     * 기존 경사도 기반 등급에 날씨 위험 계수를 곱하여 상향 조정.
-     */
-    public void adjustRiskByWeather(List<RiskSection> riskSections, WeatherInfo weather) {
-        if (weather == null || riskSections.isEmpty()) return;
-
-        double multiplier = weather.getRiskMultiplier();
-        if (multiplier <= 1.0) {
-            log.info("날씨 보정 불필요 (multiplier={})", multiplier);
-            return;
-        }
-
-        log.info("날씨 보정 적용: multiplier={} (PTY={}, 기온={}℃, 풍속={}m/s)",
-                multiplier, weather.getPrecipitationType(),
-                weather.getTemperature(), weather.getWindSpeed());
-
-        for (RiskSection rs : riskSections) {
-            String original = rs.getRiskLevel();
-            if (original == null) continue; // 등급이 없는 구간(붕괴위험 지정지)은 보정 대상이 아니다
-            String adjusted = upgradeRiskLevel(original, multiplier);
-            if (!original.equals(adjusted)) {
-                rs.setRiskLevel(adjusted);
-                log.info("  {} : {} → {} (날씨 보정)", rs.getName(), original, adjusted);
-            }
-        }
-    }
-
-    private String upgradeRiskLevel(String current, double multiplier) {
-        // 경사도에 multiplier를 적용한 것처럼 등급 상향
-        // 법정 기준(SlopeRisk)의 정적 분류는 LOW/MEDIUM/VERY_HIGH 3단계뿐이므로,
-        // 날씨 보정도 같은 3단계 내에서만 상향한다. ("HIGH"는 정적 분류에 존재하지 않는 값)
-        String[] levels = {"LOW", "MEDIUM", "VERY_HIGH"};
-        int idx = 0;
-        for (int i = 0; i < levels.length; i++) {
-            if (levels[i].equals(current)) { idx = i; break; }
-        }
-
-        // multiplier 1.4+ → 1단계 상향, 1.6+ → 2단계 상향
-        int boost = 0;
-        if (multiplier >= 1.6) boost = 2;
-        else if (multiplier >= 1.4) boost = 1;
-        else if (multiplier >= 1.2) boost = 1;
-
-        int newIdx = Math.min(idx + boost, levels.length - 1);
-        return levels[newIdx];
     }
 }

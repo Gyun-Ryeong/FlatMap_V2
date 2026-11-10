@@ -2,7 +2,6 @@ package com.flatmap.navigation.service;
 
 import com.flatmap.navigation.dto.RiskSection;
 import com.flatmap.navigation.dto.RouteResponse;
-import com.flatmap.navigation.dto.WeatherInfo;
 import com.flatmap.navigation.support.IntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -113,6 +112,15 @@ class SteepSlopeServiceTest {
         assertThat(s.getLat()).isEqualTo(ROUTE_LAT + 0.0010);
         assertThat(s.getLng()).isEqualTo(127.1020);
         assertThat(s.getGrade()).isEqualTo(12.5);   // 단위 각도(°)
+        assertThat(s.getSource()).isEqualTo("TEST");
+    }
+
+    @Test
+    void unmeasuredGradeStaysNullInsteadOfZeroDegrees() {
+        // 이전에는 null 경사도가 0.0 으로 바뀌어 "0°"로 읽혔다. 새 계약에서는 측정되지 않은 값은 null 이다.
+        insertArea("no-grade", ROUTE_LAT + 0.0010, 127.1020, null);
+
+        assertThat(service.findRiskSections(eastRoute()).get(0).getGrade()).isNull();
     }
 
     @Test
@@ -129,46 +137,5 @@ class SteepSlopeServiceTest {
         insertArea("far", 37.4500, 127.1050, 10.0);
 
         assertThat(service.findRiskSections(eastRoute())).isEmpty();
-    }
-
-    // ----- 날씨 보정: null 등급(붕괴위험 지정지) 구간 NPE 회귀 -----
-
-    private static WeatherInfo snow() {
-        WeatherInfo w = WeatherInfo.fallback();
-        w.setPrecipitationType(3);   // 눈 → multiplier 1.8
-        return w;
-    }
-
-    @Test
-    void weatherAdjustmentDoesNotThrowForSectionsWithoutLevel() {
-        List<RiskSection> sections = new ArrayList<>(List.of(
-                new RiskSection(37.4, 127.1, "no-level", 10.0, null, 50, 3)));
-
-        service.adjustRiskByWeather(sections, snow());
-
-        assertThat(sections.get(0).getRiskLevel()).isNull();
-    }
-
-    @Test
-    void weatherAdjustmentSkipsNullLevelsAndStillUpgradesOthers() {
-        List<RiskSection> sections = new ArrayList<>(List.of(
-                new RiskSection(37.4, 127.1, "no-level", 10.0, null, 50, 3),
-                new RiskSection(37.4, 127.1, "low", 2.0, "LOW", 50, 4)));
-
-        service.adjustRiskByWeather(sections, snow());
-
-        assertThat(sections.get(0).getRiskLevel()).isNull();
-        assertThat(sections.get(1).getRiskLevel()).isEqualTo("VERY_HIGH");
-    }
-
-    @Test
-    void weatherAdjustmentIsNoopForNullWeatherOrEmptyList() {
-        List<RiskSection> sections = new ArrayList<>(List.of(
-                new RiskSection(37.4, 127.1, "low", 2.0, "LOW", 50, 4)));
-
-        service.adjustRiskByWeather(sections, null);
-        service.adjustRiskByWeather(new ArrayList<>(), snow());
-
-        assertThat(sections.get(0).getRiskLevel()).isEqualTo("LOW");
     }
 }

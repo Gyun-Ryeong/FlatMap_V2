@@ -53,7 +53,7 @@ class DetourServiceTest {
     }
 
     private static RiskSection risk(double lat, double lng, int routeIdx) {
-        return new RiskSection(lat, lng, "h", 5.0, null, 100, routeIdx);
+        return new RiskSection(lat, lng, "h", 5.0, "TEST", 100, routeIdx);
     }
 
     @Test
