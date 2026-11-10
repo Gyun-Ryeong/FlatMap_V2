@@ -47,8 +47,9 @@ class DetourServiceTest {
     }
 
     private void insertArea(String name, double lat, double lng) {
-        jdbc.update("INSERT INTO steep_slope_areas (name, latitude, longitude, grade, source) VALUES (?, ?, ?, 5.0, 'TEST')",
-                name, lat, lng);
+        jdbc.update("INSERT INTO steep_slope_areas (name, grade, source, geom) " +
+                        "VALUES (?, 5.0, 'TEST', ST_SetSRID(ST_MakePoint(?, ?), 4326))",
+                name, lng, lat);
     }
 
     private static RiskSection risk(double lat, double lng, int routeIdx) {

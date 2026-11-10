@@ -54,8 +54,10 @@ class SteepSlopeServiceTest {
     }
 
     private void insertArea(String name, Double lat, Double lng, Double grade) {
-        jdbc.update("INSERT INTO steep_slope_areas (name, latitude, longitude, grade, source) VALUES (?, ?, ?, ?, 'TEST')",
-                name, lat, lng, grade);
+        // geom 이 쓰기 원본이다. 좌표가 null 이면 geom 도 null.
+        jdbc.update("INSERT INTO steep_slope_areas (name, grade, source, geom) " +
+                        "VALUES (?, ?, 'TEST', ST_SetSRID(ST_MakePoint(?::float8, ?::float8), 4326))",
+                name, grade, lng, lat);
     }
 
     @Test
