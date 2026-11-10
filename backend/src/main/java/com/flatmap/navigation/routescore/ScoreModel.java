@@ -11,7 +11,8 @@ public record ScoreModel(
         double policeRadiusMeters,
         double minRouteKm,
         PiecewiseScale exposureScale,
-        double axisWeightA) {
+        double axisWeightA,
+        double axisWeightC) {
 
     public ScoreModel {
         if (radiusMeters <= 0 || policeRadiusMeters <= 0) {
@@ -20,7 +21,7 @@ public record ScoreModel(
         if (minRouteKm <= 0) {
             throw new IllegalArgumentException("최소 경로 길이는 0 보다 커야 한다.");
         }
-        if (axisWeightA <= 0) {
+        if (axisWeightA <= 0 || axisWeightC <= 0) {
             throw new IllegalArgumentException("축 가중치는 0 보다 커야 한다.");
         }
     }

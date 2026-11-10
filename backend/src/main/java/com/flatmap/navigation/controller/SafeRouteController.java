@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 후보 경로 3종 + 경로별 점수(A축 야간 시설 노출). 조회(GET)라 공개다.
+ * 후보 경로 3종 + 경로별 점수(A축 야간 시설 노출, C축 날씨 보정). 조회(GET)라 공개다.
  */
 @RestController
 @RequestMapping("/api/routes")
@@ -24,7 +24,8 @@ public class SafeRouteController {
 
     static final String SCORE_NOTE =
             "총점은 설정된 가중치·구간으로 계산한 설계 파라미터 기반의 상대 비교 값이며, 검증된 위험도나 안전도가 아닙니다. "
-                    + "현재는 A축(야간 시설 노출)만 반영하고, 보행난이도(B)와 날씨(C)는 아직 반영하지 않습니다.";
+                    + "현재는 A축(야간 시설 노출)과 C축(날씨 보정)을 반영합니다. 기상 정보를 가져오지 못한 경로는 C축 없이 A축만으로 계산합니다. "
+                    + "보행난이도(B)는 아직 반영하지 않습니다.";
 
     private final SafeRouteService safeRouteService;
     private final ScoreModel scoreModel;
@@ -57,7 +58,7 @@ public class SafeRouteController {
         Map<String, Object> model = new LinkedHashMap<>();
         model.put("version", scoreModel.version());
         model.put("kind", "DESIGN_PARAMETER");
-        model.put("axes", List.of("A"));
+        model.put("axes", List.of("A", "C"));
         model.put("note", SCORE_NOTE);
         body.put("scoreModel", model);
         return ResponseEntity.ok(body);

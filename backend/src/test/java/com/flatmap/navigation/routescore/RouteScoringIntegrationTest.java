@@ -2,7 +2,9 @@ package com.flatmap.navigation.routescore;
 
 import com.flatmap.navigation.dto.RouteResponse;
 import com.flatmap.navigation.repository.SafetyFacilityRepository;
+import com.flatmap.navigation.dto.WeatherInfo;
 import com.flatmap.navigation.service.TMapRouteService;
+import com.flatmap.navigation.service.WeatherService;
 import com.flatmap.navigation.support.CountingDataSource;
 import com.flatmap.navigation.support.IntegrationTest;
 import org.junit.jupiter.api.AfterEach;
@@ -152,17 +154,22 @@ class RouteScoringIntegrationTest {
                 Mockito.anyDouble(), Mockito.anyDouble())).thenReturn(List.of(
                 candidate(0, "일반", 37.4100), candidate(4, "대로우선", 37.4100), candidate(10, "최단", 37.4100)));
 
-        SafeRouteService service = new SafeRouteService(tmap, counting, scorer, model);
+        WeatherService weather = Mockito.mock(WeatherService.class);
+        WeatherInfo rain = new WeatherInfo();
+        rain.setPrecipitationType(1);
+        Mockito.when(weather.getWeather(Mockito.anyDouble(), Mockito.anyDouble())).thenReturn(rain);
+
+        SafeRouteService service = new SafeRouteService(tmap, counting, scorer, model, weather);
         counted.reset();
         List<ScoredRoute> routes = service.findScoredRoutes(37.4, 127.1, 37.41, 127.1);
 
-        assertThat(counted.count()).as("경로당 집계 쿼리 1회 (정점 수 무관)").isEqualTo(3);
+        assertThat(counted.count()).as("경로당 집계 쿼리 1회 (정점 수 무관, 날씨는 DB 를 쓰지 않는다)").isEqualTo(3);
         assertThat(routes).hasSize(3);
         assertThat(routes).allSatisfy(r -> {
             assertThat(r.cctvCount()).isEqualTo(3);
             assertThat(r.lightCount()).isEqualTo(4);
             assertThat(r.policeCount()).isEqualTo(1);
-            assertThat(r.breakdown()).hasSize(1);
+            assertThat(r.breakdown()).extracting(AxisScore::axis).containsExactly("A", "C");
         });
         assertThat(routes.stream().filter(ScoredRoute::recommended)).hasSize(1);
     }

@@ -7,65 +7,127 @@ import com.flatmap.navigation.dto.WeatherInfo;
 import com.flatmap.navigation.util.GridConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 기상청 초단기예보 조회.
+ *
+ * <ul>
+ *   <li>기상청 격자(nx,ny)별 메모리 캐시 — 성공은 weather.cache-ttl-minutes 동안 재사용(히트면 외부 호출 없음).</li>
+ *   <li>실패하면 {@link WeatherInfo#fallback()}(fallback=true)을 돌려주고 weather.failure-backoff-seconds 동안
+ *       같은 격자를 다시 부르지 않는다(후보 경로 3개가 연달아 타임아웃을 기다리지 않도록).
+ *       대체값은 점수 보정에 쓰이지 않는다.</li>
+ *   <li>외부 호출에는 연결·읽기 타임아웃이 있고, 로그에는 URL·서비스키·응답 본문을 남기지 않는다(예외 종류만).</li>
+ * </ul>
+ */
 @Service
 public class WeatherService {
 
     private static final Logger log = LoggerFactory.getLogger(WeatherService.class);
     private static final String API_URL =
             "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst";
-    private static final long CACHE_TTL_MS = 30 * 60 * 1000; // 30분
+    /** 기상청 발표 시각은 한국 시간 기준이라 서버 시간대와 무관하게 KST 로 계산한다. */
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final RestTemplate restTemplate;
     private final ApiKeyConfig apiKeyConfig;
+    private final Clock clock;
+    private final long cacheTtlMs;
+    private final long failureBackoffMs;
+    private final int maxCacheEntries;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // 캐시: "nx,ny" → {weatherInfo, timestamp}
+    // 캐시: "nx,ny" → {weatherInfo, 만료 시각(ms)}. 성공과 실패(대체값)를 함께 담는다.
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
 
-    public WeatherService(RestTemplate restTemplate, ApiKeyConfig apiKeyConfig) {
+    @Autowired
+    public WeatherService(ApiKeyConfig apiKeyConfig,
+                          @Value("${weather.connect-timeout-ms}") int connectTimeoutMs,
+                          @Value("${weather.read-timeout-ms}") int readTimeoutMs,
+                          @Value("${weather.cache-ttl-minutes}") long cacheTtlMinutes,
+                          @Value("${weather.failure-backoff-seconds}") long failureBackoffSeconds,
+                          @Value("${weather.cache-max-entries}") int maxCacheEntries) {
+        this(withTimeouts(connectTimeoutMs, readTimeoutMs), apiKeyConfig, Clock.system(KST),
+                cacheTtlMinutes * 60_000L, failureBackoffSeconds * 1_000L, maxCacheEntries);
+    }
+
+    /** 테스트에서 RestTemplate·시계를 바꿔 끼우기 위한 생성자. */
+    WeatherService(RestTemplate restTemplate, ApiKeyConfig apiKeyConfig, Clock clock,
+                   long cacheTtlMs, long failureBackoffMs, int maxCacheEntries) {
+        if (cacheTtlMs <= 0 || failureBackoffMs < 0 || maxCacheEntries <= 0) {
+            throw new IllegalArgumentException("날씨 캐시 설정이 올바르지 않다.");
+        }
         this.restTemplate = restTemplate;
         this.apiKeyConfig = apiKeyConfig;
+        this.clock = clock;
+        this.cacheTtlMs = cacheTtlMs;
+        this.failureBackoffMs = failureBackoffMs;
+        this.maxCacheEntries = maxCacheEntries;
+    }
+
+    private static RestTemplate withTimeouts(int connectTimeoutMs, int readTimeoutMs) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(connectTimeoutMs);
+        factory.setReadTimeout(readTimeoutMs);
+        return new RestTemplate(factory);
     }
 
     /**
-     * 위경도 기반 현재 날씨 조회 (30분 캐싱, 실패 시 fallback).
+     * 위경도 기반 현재 날씨 조회 (격자 캐시, 실패 시 fallback).
      */
     public WeatherInfo getWeather(double lat, double lng) {
         int[] grid = GridConverter.toGrid(lat, lng);
         int nx = grid[0];
         int ny = grid[1];
-        log.info("[날씨] 격자 변환: lat={}, lng={} → nx={}, ny={}", lat, lng, nx, ny);
         String cacheKey = nx + "," + ny;
+        long now = clock.millis();
 
         CacheEntry entry = cache.get(cacheKey);
-        if (entry != null && System.currentTimeMillis() - entry.timestamp < CACHE_TTL_MS) {
+        if (entry != null && now < entry.expiresAt) {
             log.debug("날씨 캐시 히트: grid({},{})", nx, ny);
             return entry.weather;
         }
 
         try {
             WeatherInfo weather = fetchFromApi(nx, ny);
-            cache.put(cacheKey, new CacheEntry(weather, System.currentTimeMillis()));
+            put(cacheKey, new CacheEntry(weather, now + cacheTtlMs), now);
             log.info("날씨 조회 성공: grid({},{}) → {}℃, PTY={}, SKY={}",
                     nx, ny, weather.getTemperature(), weather.getPrecipitationType(), weather.getSky());
             return weather;
         } catch (Exception e) {
-            log.warn("날씨 API 호출 실패 (fallback 사용): {}", e.getMessage());
-            return WeatherInfo.fallback();
+            // 예외 메시지에는 요청 URL(서비스키 포함)이 섞일 수 있어 종류만 남긴다.
+            log.warn("날씨 API 호출 실패 (fallback 사용): grid({},{}) {}", nx, ny, e.getClass().getSimpleName());
+            WeatherInfo fallback = WeatherInfo.fallback();
+            if (failureBackoffMs > 0) {
+                put(cacheKey, new CacheEntry(fallback, now + failureBackoffMs), now);
+            }
+            return fallback;
         }
     }
 
+    /** 캐시 크기를 제한한다(/api/weather 는 임의 좌표를 받는다). 가득 차면 만료분을 먼저 치우고, 그래도 가득이면 비운다. */
+    private void put(String key, CacheEntry entry, long now) {
+        if (cache.size() >= maxCacheEntries && !cache.containsKey(key)) {
+            cache.values().removeIf(e -> now >= e.expiresAt);
+            if (cache.size() >= maxCacheEntries) cache.clear();
+        }
+        cache.put(key, entry);
+    }
+
     private WeatherInfo fetchFromApi(int nx, int ny) throws Exception {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         String baseDate = now.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String baseTime = resolveBaseTime(now);
 
@@ -89,8 +151,9 @@ public class WeatherService {
         log.info("[날씨] 기상청 API 호출: base_date={}, base_time={}, nx={}, ny={}", baseDate, baseTime, nx, ny);
 
         String response = restTemplate.getForObject(url, String.class);
-        log.info("[날씨] 기상청 API 응답 (앞 500자): {}",
-                response != null ? response.substring(0, Math.min(response.length(), 500)) : "null");
+        if (response == null) {
+            throw new IllegalStateException("기상청 API 응답 없음");
+        }
         return parseResponse(response);
     }
 
@@ -100,12 +163,13 @@ public class WeatherService {
 
         String resultCode = header.path("resultCode").asText();
         if (!"00".equals(resultCode)) {
-            throw new RuntimeException("기상청 API 오류: " + header.path("resultMsg").asText());
+            // 결과 코드만 담는다(resultMsg 는 외부 문구).
+            throw new IllegalStateException("기상청 API 오류 코드 " + resultCode);
         }
 
         JsonNode items = root.path("response").path("body").path("items").path("item");
         if (!items.isArray() || items.isEmpty()) {
-            throw new RuntimeException("기상청 API 응답 데이터 없음");
+            throw new IllegalStateException("기상청 API 응답 데이터 없음");
         }
 
         WeatherInfo weather = new WeatherInfo();
@@ -151,7 +215,7 @@ public class WeatherService {
                 default: w.setDescription("맑음"); w.setIcon("clear");
             }
         }
-        w.setDescription(w.getDescription() + ", " + String.format("%.0f", w.getTemperature()) + "\u2103");
+        w.setDescription(w.getDescription() + ", " + String.format("%.0f", w.getTemperature()) + "℃");
     }
 
     private void applyWarning(WeatherInfo w) {
@@ -199,10 +263,10 @@ public class WeatherService {
 
     private static class CacheEntry {
         final WeatherInfo weather;
-        final long timestamp;
-        CacheEntry(WeatherInfo weather, long timestamp) {
+        final long expiresAt;
+        CacheEntry(WeatherInfo weather, long expiresAt) {
             this.weather = weather;
-            this.timestamp = timestamp;
+            this.expiresAt = expiresAt;
         }
     }
 }

@@ -11,10 +11,11 @@ public class WeatherInfo {
     private String description;         // 설명 텍스트
     private String icon;                // 날씨 아이콘
     private String warning;             // 경사구간 관련 경고 메시지 (nullable)
+    private boolean fallback;           // true 면 기상 API 값이 아니라 대체값이다(점수 보정에 쓰지 않는다)
 
     public WeatherInfo() {}
 
-    // === 기본값 팩토리 (API 실패 시 fallback) ===
+    // === 대체값 팩토리 (API 실패 시). 실제 관측이 아니므로 fallback=true 로 표시하고 보정에 쓰지 않는다. ===
     public static WeatherInfo fallback() {
         WeatherInfo w = new WeatherInfo();
         w.temperature = 20.0;
@@ -23,22 +24,14 @@ public class WeatherInfo {
         w.sky = 1;
         w.humidity = 50;
         w.windSpeed = 1.0;
-        w.description = "맑음 (기본값)";
-        w.icon = "clear";
+        w.description = "날씨 정보 없음";
+        w.icon = "unknown";
         w.warning = null;
+        w.fallback = true;
         return w;
     }
 
-    // === 날씨 위험 계수 (경사도 보정에 사용) ===
-    public double getRiskMultiplier() {
-        // 눈/결빙 → 1.8배, 비 → 1.4배, 강풍(10m/s+) → 1.2배
-        if (precipitationType == 3 || precipitationType == 7) return 1.8;  // 눈
-        if (precipitationType == 2 || precipitationType == 6) return 1.6;  // 비/눈
-        if (precipitationType == 1 || precipitationType == 5) return 1.4;  // 비
-        if (temperature <= 0) return 1.6;  // 영하 결빙 위험
-        if (windSpeed >= 10) return 1.2;   // 강풍
-        return 1.0;
-    }
+    public boolean isFallback() { return fallback; }
 
     // === Getters / Setters ===
     public double getTemperature() { return temperature; }

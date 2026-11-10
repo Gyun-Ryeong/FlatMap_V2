@@ -1,7 +1,9 @@
 package com.flatmap.navigation.web;
 
 import com.flatmap.navigation.dto.RouteResponse;
+import com.flatmap.navigation.dto.WeatherInfo;
 import com.flatmap.navigation.service.TMapRouteService;
+import com.flatmap.navigation.service.WeatherService;
 import com.flatmap.navigation.support.IntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,12 +35,27 @@ class SafeRouteEndpointTest {
 
     @MockBean
     TMapRouteService tmap;
+    @MockBean
+    WeatherService weatherService;
 
     @BeforeEach
     @AfterEach
     void clean() {
         jdbc.update("DELETE FROM safety_facility");
-        Mockito.reset(tmap);
+        Mockito.reset(tmap, weatherService);
+        // 기본은 기상 API 실패(대체값) — C축 없이 A축만 반영된다. 날씨가 필요한 테스트는 다시 지정한다.
+        Mockito.when(weatherService.getWeather(Mockito.anyDouble(), Mockito.anyDouble()))
+                .thenReturn(WeatherInfo.fallback());
+    }
+
+    private static WeatherInfo rain() {
+        WeatherInfo w = new WeatherInfo();
+        w.setPrecipitationType(1);
+        w.setTemperature(12);
+        w.setWindSpeed(2);
+        w.setDescription("비, 12℃");
+        w.setIcon("rain");
+        return w;
     }
 
     private static TMapRouteService.CandidateRoute candidate(int option, String name, int time) {
@@ -90,7 +107,7 @@ class SafeRouteEndpointTest {
     }
 
     @Test
-    void responseDeclaresTheScoreAsADesignParameterAndOnlyAxisA() throws Exception {
+    void responseDeclaresTheScoreAsADesignParameterWithAxesAAndC() throws Exception {
         Mockito.when(tmap.getCandidateRoutes(Mockito.anyDouble(), Mockito.anyDouble(),
                 Mockito.anyDouble(), Mockito.anyDouble())).thenReturn(List.of(candidate(0, "일반", 800)));
 
@@ -98,9 +115,47 @@ class SafeRouteEndpointTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.scoreModel.kind").value("DESIGN_PARAMETER"))
                 .andExpect(jsonPath("$.scoreModel.axes[0]").value("A"))
-                .andExpect(jsonPath("$.scoreModel.axes.length()").value(1))
+                .andExpect(jsonPath("$.scoreModel.axes[1]").value("C"))
+                .andExpect(jsonPath("$.scoreModel.axes.length()").value(2))
                 .andExpect(jsonPath("$.scoreModel.note").value(containsString("위험도나 안전도가 아닙니다")))
-                .andExpect(jsonPath("$.scoreModel.note").value(containsString("아직 반영하지 않습니다")));
+                .andExpect(jsonPath("$.scoreModel.note").value(containsString("보행난이도(B)는 아직 반영하지 않습니다")));
+    }
+
+    @Test
+    void weatherAddsACAxisToTheBreakdownAsASeparateItem() throws Exception {
+        addFacility("CCTV", 37.4050, 127.1003);
+        Mockito.when(weatherService.getWeather(Mockito.anyDouble(), Mockito.anyDouble())).thenReturn(rain());
+        Mockito.when(tmap.getCandidateRoutes(Mockito.anyDouble(), Mockito.anyDouble(),
+                Mockito.anyDouble(), Mockito.anyDouble())).thenReturn(List.of(candidate(0, "일반", 800)));
+
+        mvc.perform(get("/api/routes/safe" + QUERY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.routes[0].breakdown.length()").value(2))
+                .andExpect(jsonPath("$.routes[0].breakdown[0].axis").value("A"))
+                .andExpect(jsonPath("$.routes[0].breakdown[1].axis").value("C"))
+                .andExpect(jsonPath("$.routes[0].breakdown[1].name").value("날씨 보정"))
+                .andExpect(jsonPath("$.routes[0].breakdown[1].score").value(71.4))        // 100 / 1.4
+                .andExpect(jsonPath("$.routes[0].breakdown[1].weight").value(0.25))
+                .andExpect(jsonPath("$.routes[0].breakdown[1].detail.condition").value("RAIN"))
+                .andExpect(jsonPath("$.routes[0].breakdown[1].detail.multiplier").value(1.4))
+                .andExpect(jsonPath("$.routes[0].weather.fallback").value(false))
+                .andExpect(jsonPath("$.routes[0].weather.icon").value("rain"));
+    }
+
+    @Test
+    void weatherFailureDropsTheCAxisButStillAnswersWithATotal() throws Exception {
+        addFacility("CCTV", 37.4050, 127.1003);
+        // 기본 stub 이 fallback 날씨
+        Mockito.when(tmap.getCandidateRoutes(Mockito.anyDouble(), Mockito.anyDouble(),
+                Mockito.anyDouble(), Mockito.anyDouble())).thenReturn(List.of(candidate(0, "일반", 800)));
+
+        mvc.perform(get("/api/routes/safe" + QUERY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.routes[0].totalScore").isNumber())
+                .andExpect(jsonPath("$.routes[0].breakdown.length()").value(1))
+                .andExpect(jsonPath("$.routes[0].breakdown[0].axis").value("A"))
+                .andExpect(jsonPath("$.routes[0].weather.fallback").value(true))
+                .andExpect(content().string(not(containsString("serviceKey"))));
     }
 
     @Test

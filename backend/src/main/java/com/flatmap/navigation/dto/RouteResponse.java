@@ -1,5 +1,8 @@
 package com.flatmap.navigation.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.flatmap.navigation.routescore.AxisScore;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,6 +15,14 @@ public class RouteResponse {
     private WeatherInfo weather;
     private boolean detourApplied = true;
     private String detourMessage;
+    /** 이 경로의 총점(0~100, 설계 파라미터 기반 상대 비교 값)과 축별 내역. 점수를 매기지 않은 응답에는 없다. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Double totalScore;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private List<AxisScore> breakdown;
+    /** 우회 요청에서 비교 기준이 된 원경로의 총점. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Double originalTotalScore;
 
     public RouteResponse(List<Coord> coords, int totalDistance, int totalDuration) {
         this.coords = coords;
@@ -33,6 +44,13 @@ public class RouteResponse {
     public void setDetourApplied(boolean detourApplied) { this.detourApplied = detourApplied; }
     public String getDetourMessage() { return detourMessage; }
     public void setDetourMessage(String detourMessage) { this.detourMessage = detourMessage; }
+
+    public Double getTotalScore() { return totalScore; }
+    public void setTotalScore(Double totalScore) { this.totalScore = totalScore; }
+    public List<AxisScore> getBreakdown() { return breakdown; }
+    public void setBreakdown(List<AxisScore> breakdown) { this.breakdown = breakdown; }
+    public Double getOriginalTotalScore() { return originalTotalScore; }
+    public void setOriginalTotalScore(Double originalTotalScore) { this.originalTotalScore = originalTotalScore; }
 
     public static class Coord {
         private double lat;

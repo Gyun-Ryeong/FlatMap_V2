@@ -1,7 +1,9 @@
 package com.flatmap.navigation.routescore;
 
+import com.flatmap.navigation.dto.WeatherInfo;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,7 +12,9 @@ import java.util.Map;
  * 경로 점수 계산(순수 함수 — DB 에 접근하지 않는다).
  *
  * <p>A축(야간 시설 노출) = 구간 함수( 가중 시설 수 ÷ 경로 길이(km) ).
- * 총점은 반영된 축 점수의 가중 평균이며, 지금은 A축 하나뿐이다.
+ * C축(날씨 보정) = 100 ÷ 날씨 보정 계수 — 실제 기상 값이 있을 때만 반영한다.
+ * 기상 API 실패로 대체값(fallback)이 온 경우에는 C축을 넣지 않는다(0점이나 100점으로 채우지 않는다).
+ * 총점은 반영된 축 점수의 가중 평균이다. B축(보행난이도)은 아직 없다.
  * 이 점수는 설계 파라미터에서 나온 상대 비교 값이고 과학적 위험도·안전도가 아니다.
  */
 @Component
@@ -19,14 +23,29 @@ public class RouteScorer {
     public static final String AXIS_A = "A";
     public static final String AXIS_A_NAME = "야간 시설 노출";
 
-    private final ScoreModel model;
+    public static final String AXIS_C = "C";
+    public static final String AXIS_C_NAME = "날씨 보정";
 
-    public RouteScorer(ScoreModel model) {
+    private final ScoreModel model;
+    private final WeatherCorrection weatherCorrection;
+
+    public RouteScorer(ScoreModel model, WeatherCorrection weatherCorrection) {
         this.model = model;
+        this.weatherCorrection = weatherCorrection;
     }
 
+    /** A축만 반영한 점수(날씨 없음). */
     public RouteScore score(RouteExposure exposure) {
-        List<AxisScore> axes = List.of(axisA(exposure));
+        return score(exposure, null);
+    }
+
+    /** weather 가 null 이거나 fallback 이면 C축 없이 A축만 반영한다. */
+    public RouteScore score(RouteExposure exposure, WeatherInfo weather) {
+        List<AxisScore> axes = new ArrayList<>();
+        axes.add(axisA(exposure));
+        if (weather != null && !weather.isFallback()) {
+            axes.add(axisC(weather));
+        }
         double weightSum = 0;
         double weighted = 0;
         for (AxisScore a : axes) {
@@ -52,6 +71,13 @@ public class RouteScorer {
         detail.put("radiusMeters", model.radiusMeters());
         detail.put("policeRadiusMeters", model.policeRadiusMeters());
         return new AxisScore(AXIS_A, AXIS_A_NAME, score, model.axisWeightA(), detail);
+    }
+
+    AxisScore axisC(WeatherInfo w) {
+        WeatherCorrection.Applied applied = weatherCorrection.apply(w);
+        double score = round1(weatherCorrection.score(applied.multiplier()));
+        return new AxisScore(AXIS_C, AXIS_C_NAME, score, model.axisWeightC(),
+                weatherCorrection.detail(w, applied));
     }
 
     private static double round1(double v) {

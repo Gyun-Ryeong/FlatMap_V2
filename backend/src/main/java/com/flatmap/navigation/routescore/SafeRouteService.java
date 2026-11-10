@@ -1,8 +1,10 @@
 package com.flatmap.navigation.routescore;
 
 import com.flatmap.navigation.dto.RouteResponse;
+import com.flatmap.navigation.dto.WeatherInfo;
 import com.flatmap.navigation.repository.SafetyFacilityRepository;
 import com.flatmap.navigation.service.TMapRouteService;
+import com.flatmap.navigation.service.WeatherService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -13,8 +15,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 후보 경로 3종을 받아 경로마다 A축(야간 시설 노출) 점수를 매긴다.
- * 경로 하나당 시설 집계 쿼리는 정확히 한 번이다(샘플 점마다 묻지 않는다).
+ * 후보 경로 3종을 받아 경로마다 A축(야간 시설 노출)과 C축(날씨 보정) 점수를 매긴다.
+ * 경로 하나당 시설 집계 쿼리는 정확히 한 번이다(샘플 점마다 묻지 않는다). 날씨는 격자 캐시를 거치므로
+ * 같은 격자의 후보끼리는 외부 호출이 한 번이다. 날씨를 얻지 못하면(fallback) C축 없이 A축만으로 점수를 낸다.
  */
 @Service
 public class SafeRouteService {
@@ -25,13 +28,31 @@ public class SafeRouteService {
     private final SafetyFacilityRepository facilities;
     private final RouteScorer scorer;
     private final ScoreModel model;
+    private final WeatherService weatherService;
 
     public SafeRouteService(TMapRouteService tmap, SafetyFacilityRepository facilities,
-                            RouteScorer scorer, ScoreModel model) {
+                            RouteScorer scorer, ScoreModel model, WeatherService weatherService) {
         this.tmap = tmap;
         this.facilities = facilities;
         this.scorer = scorer;
         this.model = model;
+        this.weatherService = weatherService;
+    }
+
+    /** 경로 하나의 평가 결과: 점수(축별 내역 포함), 시설 집계, 점수에 쓴 날씨. */
+    public record Evaluation(RouteScore score, RouteExposure exposure, WeatherInfo weather) {
+    }
+
+    /**
+     * 경로 좌표({@code [위도, 경도]})의 점수를 계산한다 — 시설 집계 쿼리 1회 + 경로 중간 지점 날씨(캐시).
+     * 우회 경로 통합(DetourRouteService)도 같은 함수를 쓴다.
+     */
+    public Evaluation evaluate(List<double[]> coordinates) {
+        RouteExposure exposure = facilities.countAlongRoute(
+                RouteGeometry.toWkt(coordinates), model.radiusMeters(), model.policeRadiusMeters());
+        double[] mid = coordinates.get(coordinates.size() / 2);
+        WeatherInfo weather = weatherService.getWeather(mid[0], mid[1]);
+        return new Evaluation(scorer.score(exposure, weather), exposure, weather);
     }
 
     /** 후보 경로를 모두 얻지 못하면(모두 실패) 빈 목록. 일부만 성공해도 그 경로들로 진행한다. */
@@ -53,9 +74,9 @@ public class SafeRouteService {
             coordinates.add(new double[]{c.getLat(), c.getLng()});
         }
 
-        RouteExposure exposure = facilities.countAlongRoute(
-                RouteGeometry.toWkt(coordinates), model.radiusMeters(), model.policeRadiusMeters());
-        RouteScore score = scorer.score(exposure);
+        Evaluation evaluation = evaluate(coordinates);
+        RouteExposure exposure = evaluation.exposure();
+        RouteScore score = evaluation.score();
         log.info("경로 점수 계산: searchOption={}, 총점={}, CCTV={}, 보안등={}, 경찰={}",
                 candidate.searchOption(), score.totalScore(),
                 exposure.cctvCount(), exposure.lightCount(), exposure.policeCount());
@@ -72,6 +93,7 @@ public class SafeRouteService {
                 (int) exposure.cctvCount(),
                 (int) exposure.lightCount(),
                 (int) exposure.policeCount(),
+                evaluation.weather(),
                 false);
     }
 

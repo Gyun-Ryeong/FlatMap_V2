@@ -150,10 +150,10 @@ public class TMapRouteService {
             return parsePedestrianResponse(responseEntity.getBody());
         } catch (org.springframework.web.client.RestClientResponseException e) {
             log.error("T Map HTTP 에러: {}", e.getStatusCode());
-            throw new RuntimeException("경로 검색에 실패했습니다.", e);
+            throw new RouteProviderException("경로 검색에 실패했습니다.", e);
         } catch (RestClientException e) {
             log.error("T Map 보행자 경로 API 호출 실패: {}", e.getClass().getSimpleName());
-            throw new RuntimeException("경로 검색에 실패했습니다.", e);
+            throw new RouteProviderException("경로 검색에 실패했습니다.", e);
         }
     }
 
@@ -173,7 +173,7 @@ public class TMapRouteService {
 
             if (!features.isArray() || features.isEmpty()) {
                 log.warn("T Map 경로 응답에 features가 없음");
-                throw new RuntimeException("경로를 찾을 수 없습니다.");
+                throw new RouteProviderException("경로를 찾을 수 없습니다.");
             }
 
             // 첫 번째 Feature의 properties에서 총 거리/시간 추출
@@ -200,7 +200,7 @@ public class TMapRouteService {
 
             if (coords.isEmpty()) {
                 log.warn("T Map 경로 응답에 LineString 좌표가 없음");
-                throw new RuntimeException("경로를 찾을 수 없습니다.");
+                throw new RouteProviderException("경로를 찾을 수 없습니다.");
             }
 
             log.info("T Map 경로 파싱 완료: 거리={}m, 시간={}초, 좌표={}개", totalDistance, totalTime, coords.size());
@@ -211,7 +211,7 @@ public class TMapRouteService {
             throw e;
         } catch (Exception e) {
             log.error("T Map 경로 응답 파싱 실패: {}", e.getClass().getSimpleName());
-            throw new RuntimeException("경로 응답 처리에 실패했습니다.", e);
+            throw new RouteProviderException("경로 응답 처리에 실패했습니다.", e);
         }
     }
 }
