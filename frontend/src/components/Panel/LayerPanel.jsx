@@ -7,6 +7,7 @@ export const FACILITY_LAYERS = [
 
 export const AREA_LAYERS = [
   { key: 'DENSITY', label: '시설 밀도 격자', meta: '시설이 적은 곳 확인', color: '#4f6f9c', symbol: '▦' },
+  { key: 'STEEP', label: '급경사지 경고', meta: '붕괴위험 지정지', color: '#e0701f', symbol: '!' },
 ];
 
 // 카카오 지도 레벨 5 이하(확대)에서만 시설이 불러와진다 — FacilityOverlay 와 같은 기준
@@ -59,7 +60,7 @@ function Tile({ label, meta, color, symbol, active, onClick }) {
   );
 }
 
-export default function LayerPanel({ layers, onToggle, onToggleAllFacilities, zoom, facilityTruncated, extraLayers = [] }) {
+export default function LayerPanel({ layers, onToggle, onToggleAllFacilities, zoom, facilityTruncated, steepCount }) {
   const allFacilitiesOn = FACILITY_LAYERS.every((f) => layers[f.key]);
   const anyFacilityOn = FACILITY_LAYERS.some((f) => layers[f.key]);
   const tooFar = (anyFacilityOn || layers.DENSITY) && zoom != null && zoom > FACILITY_MAX_LEVEL;
@@ -85,15 +86,17 @@ export default function LayerPanel({ layers, onToggle, onToggleAllFacilities, zo
 
       <div className="facility-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
         {FACILITY_LAYERS.map((f) => (
-          <Tile key={f.key} {...f} active={!!layers[f.key]} onClick={() => onToggle(f.key)} />
+          <Tile key={f.key} label={f.label} meta={f.meta} color={f.color} symbol={f.symbol} active={!!layers[f.key]} onClick={() => onToggle(f.key)} />
         ))}
         {AREA_LAYERS.map((f) => (
-          <Tile key={f.key} {...f} active={!!layers[f.key]} onClick={() => onToggle(f.key)} />
-        ))}
-        {extraLayers.map((f) => (
-          <Tile key={f.key} {...f} active={!!layers[f.key]} onClick={() => onToggle(f.key)} />
+          <Tile key={f.key} label={f.label} meta={f.meta} color={f.color} symbol={f.symbol} active={!!layers[f.key]} onClick={() => onToggle(f.key)} />
         ))}
       </div>
+      {layers.STEEP && (
+        <p className="layer-footnote">
+          급경사지 경고는 붕괴위험으로 지정된 곳만 모은 표본{steepCount != null ? ` ${steepCount}건` : ''}이며, 보행 난이도와는 별개입니다.
+        </p>
+      )}
     </div>
   );
 }

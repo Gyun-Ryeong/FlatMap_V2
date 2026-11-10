@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import './styles/global.css';
 import './styles/app.css';
+import './styles/features.css';
 import HomeScreen from './components/Home/HomeScreen';
 import MapPage from './pages/MapPage';
 import { AuthProvider } from './context/AuthContext';

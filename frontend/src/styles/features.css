@@ -1,0 +1,112 @@
+/* FlatMap 에서 이식한 기능(계정·즐겨찾기·최근 검색·날씨·급경사지 경고·우회)의 스타일 */
+
+/* 계정 */
+.kakao-login-btn {
+  min-height: 40px; padding: 7px 12px; border: 0; border-radius: 9px; background: #fee500; color: #191919;
+  font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit;
+}
+.kakao-user-info { display: flex; align-items: center; gap: 8px; }
+.kakao-user-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+.kakao-user-nickname { font-size: 14px; font-weight: 700; color: #3d4450; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kakao-logout-btn {
+  min-height: 36px; padding: 5px 10px; border: 1.5px solid #cfd4dd; border-radius: 8px; background: white; color: #4f5662;
+  font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+
+/* 입력칸 ★ */
+.favorite-star-btn {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; min-height: 0 !important;
+  border: 0; border-radius: 8px; background: transparent; color: #b6bcc7; font-size: 20px; cursor: pointer;
+}
+.favorite-star-btn:hover:not(:disabled) { background: #f3f5f8; color: #e0a415; }
+.favorite-star-btn.active { color: #e0a415; cursor: default; }
+.favorite-star-btn:disabled:not(.active) { opacity: 0.4; cursor: default; }
+
+/* 즐겨찾기·최근 검색 */
+.place-shortcuts { border: 1.5px solid #e0e3e8; border-radius: 12px; background: #fafbfc; padding: 8px 10px 10px; }
+.place-shortcuts-tabs { display: flex; gap: 6px; margin-bottom: 6px; }
+.place-shortcuts-tabs button {
+  flex: 1; min-height: 38px !important; border: 1.5px solid #d9dde4; border-radius: 8px; background: white; color: #5b6370;
+  font-size: 13px; font-weight: 800; cursor: pointer; font-family: inherit;
+}
+.place-shortcuts-tabs button.active { border-color: #4f6f9c; background: #e8eff8; color: #27456f; }
+.place-shortcuts-empty { margin: 8px 2px 2px; font-size: 13px; color: #737a86; line-height: 1.5; }
+.place-shortcuts-list { list-style: none; margin: 0; padding: 0; max-height: 168px; overflow-y: auto; }
+.place-shortcuts-list li { display: flex; align-items: stretch; border-bottom: 1px solid #eceef2; }
+.place-shortcuts-list li:last-child { border-bottom: 0; }
+.place-shortcuts-main {
+  flex: 1; min-width: 0; text-align: left; padding: 7px 4px; border: 0; background: none; cursor: pointer; font-family: inherit;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.place-shortcuts-main:hover { background: #f1f4f8; }
+.place-shortcuts-name { font-size: 14px; font-weight: 700; color: #30343d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.place-shortcuts-address { font-size: 12px; color: #7a818c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.place-shortcuts-remove { width: 36px; border: 0; background: none; color: #9aa1ad; font-size: 18px; cursor: pointer; }
+.place-shortcuts-clear {
+  margin-top: 6px; min-height: 34px !important; border: 0; background: none; color: #6b7480; font-size: 12px; font-weight: 700;
+  text-decoration: underline; cursor: pointer; font-family: inherit;
+}
+
+/* 날씨 */
+.weather-card { padding: 10px 12px; border: 1px solid #dfe5ee; border-radius: 10px; background: #f6f8fb; }
+.weather-card-missing { display: flex; align-items: center; gap: 10px; }
+.weather-missing-note { font-size: 12px; color: #6b7480; margin-top: 2px; }
+.weather-main { display: flex; align-items: center; gap: 10px; }
+.weather-icon-large { font-size: 28px; }
+.weather-info { display: flex; flex-direction: column; flex: 1; }
+.weather-temp { font-size: 20px; font-weight: 800; color: #20232b; }
+.weather-desc { font-size: 13px; color: #4f5662; font-weight: 700; }
+.weather-detail { display: flex; flex-direction: column; font-size: 12px; color: #5f6570; text-align: right; }
+.weather-warning {
+  margin-top: 8px; padding: 7px 10px; border-radius: 8px; background: #fbf5e6; border: 1px solid #e6d8b2;
+  color: #7d6220; font-size: 12.5px; font-weight: 700; display: flex; gap: 6px; align-items: flex-start;
+}
+.weather-mini {
+  position: absolute; top: 10px; right: 56px; z-index: 90; display: flex; align-items: center; gap: 5px; padding: 6px 11px;
+  border-radius: 99px; background: rgba(255, 255, 255, 0.95); border: 1px solid #d5dbe4; box-shadow: 0 2px 8px rgba(70, 90, 120, 0.15);
+  font-size: 14px; font-weight: 800; color: #30343d;
+}
+.weather-mini.warning { border-color: #e0c27a; }
+
+/* 경로 상세: 경고·우회 */
+.route-detail { display: flex; flex-direction: column; gap: 8px; }
+.route-detail-note { margin: 0; font-size: 12px; color: #6b7480; line-height: 1.55; }
+.slope-warning { padding: 10px 12px; border-radius: 10px; background: #fdf5ed; border: 1px solid #efd3b6; }
+.slope-warning-title { font-size: 13.5px; font-weight: 800; color: #9a4f12; margin-bottom: 6px; }
+.slope-warning-list { list-style: none; margin: 0 0 6px; padding: 0; }
+.slope-warning-list li { display: flex; flex-direction: column; padding: 4px 0; border-bottom: 1px dashed #efd9c2; }
+.slope-warning-list li:last-child { border-bottom: 0; }
+.slope-warning-name { font-size: 13px; font-weight: 700; color: #3d3226; }
+.slope-warning-detail { font-size: 12px; color: #7a6a58; }
+.detour-btn {
+  min-height: 46px; padding: 10px 12px; border-radius: 10px; border: 1.5px solid #8fb7e6; background: #eef5fd; color: #1f4f86;
+  font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit;
+}
+.detour-btn:disabled { opacity: 0.6; cursor: wait; }
+.detour-result { padding: 10px 12px; border-radius: 10px; background: #eef5fd; border: 1px solid #b7d1ee; }
+.detour-result-title { font-size: 13.5px; font-weight: 800; color: #1f4f86; margin-bottom: 4px; }
+.detour-result-stats { display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 700; color: #34495f; }
+
+/* 급경사지 레이어 */
+.steep-dot {
+  width: 18px; height: 18px; border-radius: 50%; background: #e0701f; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); cursor: pointer;
+}
+.layer-footnote { margin: 0; font-size: 12px; color: #6b7480; line-height: 1.5; }
+.layer-info-window {
+  min-width: 190px; max-width: 260px; background: white; border-radius: 10px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); overflow: hidden; font-size: 13px;
+}
+.layer-info-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; background: #fdf1e6;
+  color: #7a3d0c; font-weight: 800;
+}
+.layer-info-close { border: 0; background: none; font-size: 18px; line-height: 1; color: #7a3d0c; cursor: pointer; }
+.layer-info-body { padding: 8px 10px; color: #3d4450; }
+.layer-info-body p { margin: 0 0 3px; }
+
+/* 즐겨찾기 지도 마커 */
+.fav-map-marker { display: flex; flex-direction: column; align-items: center; }
+.fav-map-pin { color: #e0a415; font-size: 22px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); line-height: 1; }
+.fav-map-label {
+  margin-top: 1px; padding: 1px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.92); border: 1px solid #e6d8b2;
+  font-size: 11px; font-weight: 700; color: #5c4a14; white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis;
+}

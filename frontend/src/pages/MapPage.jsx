@@ -1,14 +1,20 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Header from '../components/Header';
+import AccountButton from '../components/AccountButton';
 import KakaoMap from '../components/KakaoMap';
 import SearchBar from '../components/SearchBar';
 import RouteOptions from '../components/Panel/RouteOptions';
 import LayerPanel from '../components/Panel/LayerPanel';
+import PlaceShortcuts from '../components/Panel/PlaceShortcuts';
 import ScoreGuide from '../components/Panel/ScoreGuide';
 import RouteResult from '../components/Route/RouteResult';
+import RouteDetail from '../components/Route/RouteDetail';
+import WeatherMini from '../components/Weather/WeatherMini';
 import RouteOverlay from '../components/Map/RouteOverlay';
 import FacilityOverlay from '../components/Map/FacilityOverlay';
 import DensityOverlay from '../components/Map/DensityOverlay';
+import SteepSlopeOverlay from '../components/Map/SteepSlopeOverlay';
+import FavoriteOverlay from '../components/Map/FavoriteOverlay';
 import LocationOverlay from '../components/Map/LocationOverlay';
 import PointOverlay from '../components/Map/PointOverlay';
 import DensityNotice from '../components/DensityNotice';
@@ -16,9 +22,16 @@ import SOSModal from '../components/SOSModal';
 import useRoute from '../hooks/useRoute';
 import useCurrentLocation from '../hooks/useCurrentLocation';
 import useDensityNotice from '../hooks/useDensityNotice';
+import useFavorites from '../hooks/useFavorites';
+import useDetour from '../hooks/useDetour';
+import { fetchWeather } from '../api/mapData';
+import {
+  getSearchHistory, addSearchHistory, removeSearchHistory, clearSearchHistory,
+} from '../utils/searchHistory';
 import { pickRouteByPriority, PRIORITY_OPTIONS } from '../utils/routePriority';
 
-const DEFAULT_LAYERS = { CCTV: true, SECURITY_LIGHT: true, POLICE: true, DENSITY: false };
+const DEFAULT_LAYERS = { CCTV: true, SECURITY_LIGHT: true, POLICE: true, DENSITY: false, STEEP: false };
+const DEFAULT_CENTER = { lat: 37.4201, lng: 127.1265 }; // 성남시청 (위치를 못 얻을 때의 날씨 기준점)
 const FACILITY_KEYS = ['CCTV', 'SECURITY_LIGHT', 'POLICE'];
 const BOUNDS_DEBOUNCE_MS = 500;
 
@@ -27,6 +40,8 @@ export default function MapPage({ onHome }) {
   const [mapFailed, setMapFailed] = useState(false);
   const [origin, setOrigin] = useState(null);
   const [destination, setDestination] = useState(null);
+  const [originPlace, setOriginPlace] = useState(null);
+  const [destPlace, setDestPlace] = useState(null);
   const [originLabel, setOriginLabel] = useState(undefined);
   const [destLabel, setDestLabel] = useState(undefined);
   const [clickMode, setClickMode] = useState(null);
@@ -39,15 +54,39 @@ export default function MapPage({ onHome }) {
   const [zoom, setZoom] = useState(null);
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const [sosOpen, setSosOpen] = useState(false);
+  const [steepCount, setSteepCount] = useState(null);
+  const [history, setHistory] = useState(getSearchHistory);
+  const [mapWeather, setMapWeather] = useState(null);
 
   const boundsTimerRef = useRef(null);
   const initialCenteredRef = useRef(false);
+  const activeFieldRef = useRef(null);
+  const weatherFetchedRef = useRef(false);
   const priorityRef = useRef(priority);
   priorityRef.current = priority;
 
   const { routes, scoreModel, loading, error, fetchRoutes, clearRoutes } = useRoute();
   const { location: currentLocation, error: locationError } = useCurrentLocation();
   const { notice: densityNotice, dismiss: dismissDensityNotice } = useDensityNotice(currentLocation);
+  const { isLoggedIn, favorites, isFavorited, add: addFavorite, remove: removeFavorite } = useFavorites();
+  const selectedRoute = (routes ?? []).find((r) => r.routeId === selectedRouteId) ?? null;
+  const { detour, requestDetour } = useDetour(selectedRoute, origin, destination);
+
+  // 지도 위 날씨 칩: 첫 위치(없으면 기본 위치) 기준으로 한 번만 조회한다. 경로별 날씨는 경로 응답에 들어 있다.
+  useEffect(() => {
+    if (weatherFetchedRef.current) return undefined;
+    const fallbackTimer = setTimeout(() => {
+      if (weatherFetchedRef.current) return;
+      weatherFetchedRef.current = true;
+      fetchWeather(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng).then(setMapWeather);
+    }, 4000);
+    if (currentLocation) {
+      weatherFetchedRef.current = true;
+      clearTimeout(fallbackTimer);
+      fetchWeather(currentLocation.lat, currentLocation.lng).then(setMapWeather);
+    }
+    return () => clearTimeout(fallbackTimer);
+  }, [currentLocation]);
 
   // 경로가 도착하면 선택한 기준(안전 우선/균형/빠른 길)에 맞는 경로를 고르고 결과 뷰로 전환
   useEffect(() => {
@@ -101,17 +140,49 @@ export default function MapPage({ onHome }) {
     map.setCenter(new window.kakao.maps.LatLng(lat, lng));
   }, [map]);
 
-  const handleSelectOrigin = useCallback((lat, lng, label) => {
+  // place 는 장소 검색 결과(이름·주소 포함)일 때만 넘어온다. 검색한 장소는 최근 검색에 남긴다.
+  const handleSelectOrigin = useCallback((lat, lng, label, place) => {
     setOrigin({ lat, lng });
+    setOriginPlace({ name: label ?? '', lat, lng, address: place?.address ?? '' });
     if (label) setOriginLabel(label);
+    if (place) setHistory(addSearchHistory(place));
     moveCenter(lat, lng);
   }, [moveCenter]);
 
-  const handleSelectDestination = useCallback((lat, lng, label) => {
+  const handleSelectDestination = useCallback((lat, lng, label, place) => {
     setDestination({ lat, lng });
+    setDestPlace({ name: label ?? '', lat, lng, address: place?.address ?? '' });
     if (label) setDestLabel(label);
+    if (place) setHistory(addSearchHistory(place));
     moveCenter(lat, lng);
   }, [moveCenter]);
+
+  // 즐겨찾기·최근 검색을 누르면 포커스된 칸(출발지 칸이면 출발지, 아니면 도착지)에 넣는다.
+  const handlePickShortcut = (place) => {
+    if (activeFieldRef.current === 'origin') {
+      handleSelectOrigin(place.lat, place.lng, place.name, place);
+    } else {
+      handleSelectDestination(place.lat, place.lng, place.name, place);
+    }
+  };
+
+  const renderFavoriteStar = (fieldKey) => {
+    if (!isLoggedIn) return null;
+    const place = fieldKey === 'origin' ? originPlace : destPlace;
+    const favorited = isFavorited(place);
+    return (
+      <button
+        type="button"
+        className={`favorite-star-btn${favorited ? ' active' : ''}`}
+        disabled={!place || favorited}
+        onClick={() => addFavorite(place)}
+        title={favorited ? '이미 즐겨찾기에 있음' : '즐겨찾기 추가'}
+        aria-label={favorited ? '이미 즐겨찾기에 있음' : '즐겨찾기에 추가'}
+      >
+        ★
+      </button>
+    );
+  };
 
   const handleMapClick = useCallback((lat, lng) => {
     const label = `선택한 위치 (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
@@ -166,7 +237,13 @@ export default function MapPage({ onHome }) {
 
   return (
     <div className="map-page">
-      <Header mapReady={!!map} mapFailed={mapFailed} onHome={onHome} onSOS={() => setSosOpen(true)} />
+      <Header
+        mapReady={!!map}
+        mapFailed={mapFailed}
+        onHome={onHome}
+        onSOS={() => setSosOpen(true)}
+        accountSlot={<AccountButton />}
+      />
 
       <div className="map-stage">
         <KakaoMap
@@ -198,6 +275,9 @@ export default function MapPage({ onHome }) {
         >
           {locationError ? '🚫' : currentLocation ? '📍' : '⏳'}
         </button>
+
+        {/* 현재 위치 날씨 */}
+        <WeatherMini weather={mapWeather} />
 
         {/* 시설이 적은 구역 안내 */}
         {densityNotice && <DensityNotice cell={densityNotice} onDismiss={dismissDensityNotice} />}
@@ -236,6 +316,18 @@ export default function MapPage({ onHome }) {
                   destValue={destLabel}
                   clickMode={clickMode}
                   onChangeClickMode={setClickMode}
+                  onFieldFocus={(key) => { activeFieldRef.current = key; }}
+                  fieldExtras={renderFavoriteStar}
+                />
+
+                <PlaceShortcuts
+                  isLoggedIn={isLoggedIn}
+                  favorites={favorites}
+                  onRemoveFavorite={removeFavorite}
+                  history={history}
+                  onRemoveHistory={(id) => setHistory(removeSearchHistory(id))}
+                  onClearHistory={() => setHistory(clearSearchHistory())}
+                  onPick={handlePickShortcut}
                 />
 
                 <RouteOptions priority={priority} onChangePriority={setPriority} />
@@ -260,6 +352,9 @@ export default function MapPage({ onHome }) {
                 routes={routes ?? []}
                 selectedRouteId={selectedRouteId}
                 onSelectRoute={handleSelectRoute}
+                renderDetail={(route) => (
+                  <RouteDetail route={route} detour={detour} onRequestDetour={requestDetour} />
+                )}
               />
             </>
           )}
@@ -270,15 +365,23 @@ export default function MapPage({ onHome }) {
             onToggleAllFacilities={handleToggleAllFacilities}
             zoom={zoom}
             facilityTruncated={facilityTruncated}
+            steepCount={steepCount}
           />
 
           <ScoreGuide scoreModel={scoreModel} />
         </div>
       </div>
 
-      <RouteOverlay map={map} routes={routes ?? []} selectedRouteId={selectedRouteId} />
+      <RouteOverlay
+        map={map}
+        routes={routes ?? []}
+        selectedRouteId={selectedRouteId}
+        detour={detour.status === 'done' ? detour.data : null}
+      />
       <FacilityOverlay map={map} layers={layers} bounds={bounds} zoom={zoom} onTruncated={setFacilityTruncated} />
       <DensityOverlay map={map} enabled={layers.DENSITY} bounds={bounds} zoom={zoom} />
+      <SteepSlopeOverlay map={map} enabled={layers.STEEP} onLoaded={setSteepCount} />
+      <FavoriteOverlay map={map} favorites={favorites} />
       <LocationOverlay map={map} location={currentLocation} />
       <PointOverlay map={map} point={origin} type="origin" />
       <PointOverlay map={map} point={destination} type="dest" />
