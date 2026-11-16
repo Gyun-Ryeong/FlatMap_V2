@@ -10,7 +10,7 @@ export default function RouteOptions({ priority, onChangePriority, walkMode, onC
         <span style={{ fontSize: 12, color: '#69707c', fontWeight: 600 }}>하나 선택</span>
       </div>
 
-      <div className="priority-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7 }}>
+      <div className="priority-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7 }}>
         {PRIORITY_OPTIONS.map((option) => {
           const selected = priority === option.value;
           return (

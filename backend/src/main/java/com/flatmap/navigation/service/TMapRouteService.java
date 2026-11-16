@@ -24,11 +24,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * T Map 보행자 경로 호출 — FlatMap 의 단일 경로 조회와 SafetyRoad 의 후보 경로 3종을 하나로 합친 서비스.
+ * T Map 보행자 경로 호출 — FlatMap 의 단일 경로 조회와 후보 경로(SafetyRoad 3종 + FlatMap 의 계단 제외 옵션)를 하나로 합친 서비스.
  *
  * <ul>
  *   <li>{@link #getWalkingRoute}: 옵션 하나(SAFE/SHORT/FLAT)로 경로 한 개. 실패하면 예외(기존 동작).</li>
- *   <li>{@link #getCandidateRoutes}: searchOption 0 / 4 / 10 후보 3종. <b>하나가 실패해도 나머지로 진행</b>한다.</li>
+ *   <li>{@link #getCandidateRoutes}: searchOption 0 / 4 / 10 (SafetyRoad 후보 3종) + 30 (FlatMap 의 FLAT 옵션, 최단+계단 제외).
+ *       <b>하나가 실패해도 나머지로 진행</b>한다. 순차 호출이라 최악 지연은 호출 수 × 읽기 타임아웃이다.</li>
  * </ul>
  *
  * 외부 호출에는 연결·읽기 타임아웃이 있고(tmap.*-timeout-ms), 로그와 예외에는 URL·키·응답 본문을 남기지 않는다.
@@ -39,7 +40,7 @@ public class TMapRouteService {
     private static final Logger log = LoggerFactory.getLogger(TMapRouteService.class);
     private static final String TMAP_PEDESTRIAN_URL = "https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1";
 
-    /** 후보 경로 3종: T Map searchOption → 표시 이름 (SafetyRoad 와 같은 값). */
+    /** 후보 경로: T Map searchOption → 표시 이름. 0/4/10 은 SafetyRoad 와 같은 값, 30 은 FlatMap 의 FLAT 옵션(계단 제외)이다. */
     private static final Map<Integer, String> CANDIDATE_OPTIONS = candidateOptions();
 
     private final RestTemplate restTemplate;
@@ -76,6 +77,7 @@ public class TMapRouteService {
         m.put(0, "일반");
         m.put(4, "대로우선");
         m.put(10, "최단");
+        m.put(30, "계단 제외");
         return java.util.Collections.unmodifiableMap(m);
     }
 
@@ -108,7 +110,7 @@ public class TMapRouteService {
     }
 
     /**
-     * 후보 경로 3종(searchOption 0 / 4 / 10)을 조회한다. 하나가 실패하면 그 후보만 빼고 계속한다.
+     * 후보 경로(searchOption 0 / 4 / 10 / 30)를 조회한다. 하나가 실패하면 그 후보만 빼고 계속한다.
      * 모두 실패하면 빈 목록이다(예외를 던지지 않는다).
      */
     public List<CandidateRoute> getCandidateRoutes(double startLat, double startLng,

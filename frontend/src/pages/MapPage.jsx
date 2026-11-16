@@ -92,7 +92,7 @@ export default function MapPage({ onHome }) {
     return () => clearTimeout(fallbackTimer);
   }, [currentLocation]);
 
-  // 경로가 도착하면 선택한 기준(안전 우선/균형/빠른 길)에 맞는 경로를 고르고 결과 뷰로 전환
+  // 경로가 도착하면 선택한 기준(안전 우선/균형/빠른 길/오르막 최소)에 맞는 경로를 고르고 결과 뷰로 전환
   useEffect(() => {
     if (!routes || routes.length === 0) return;
     const picked = pickRouteByPriority(routes, priorityRef.current);

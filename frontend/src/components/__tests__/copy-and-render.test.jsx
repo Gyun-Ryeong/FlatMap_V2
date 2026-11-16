@@ -133,6 +133,7 @@ describe('문구 규칙 (미구현 기능을 있는 것처럼 쓰지 않는다)'
     expect(html).toContain('안전 우선');
     expect(html).toContain('균형');
     expect(html).toContain('빠른 길');
+    expect(html).toContain('오르막 최소');
   });
 
   it('점수 내역: 보행난이도(B축)는 구간 비율·기준 각도·평균/최대 경사를 보여 준다', () => {

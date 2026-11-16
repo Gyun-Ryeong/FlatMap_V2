@@ -14,6 +14,7 @@ describe('우회 요청', () => {
     expect(detourOptionFor(0)).toBe('SAFE');
     expect(detourOptionFor(4)).toBe('MAIN_ROAD');
     expect(detourOptionFor(10)).toBe('SHORT');
+    expect(detourOptionFor(30)).toBe('FLAT');
     expect(detourOptionFor(99)).toBe('SAFE');
   });
 
