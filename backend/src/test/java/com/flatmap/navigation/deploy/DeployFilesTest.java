@@ -264,6 +264,7 @@ class DeployFilesTest {
                 walk.filter(Files::isRegularFile)
                         .filter(p -> !p.toString().replace('\\', '/').contains("/docs/dev/"))
                         .filter(p -> !p.getFileName().toString().equals("DeployFilesTest.java"))   // 이 검사 자신
+                        .filter(p -> !p.getFileName().toString().equals("CHANGELOG.md"))           // 변경 기록은 과거 의존을 언급할 수 있다
                         .filter(p -> p.toString().matches(".*\\.(java|js|jsx|json|md|yml|yaml|properties|html|css|conf|template|sh|sql)$"))
                         .forEach(files::add);
             }
