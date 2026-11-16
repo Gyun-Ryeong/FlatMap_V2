@@ -1,0 +1,16 @@
+# 이미지 빌드 컨텍스트에서 제외한다. 특히 frontend/.env(카카오 키 등)가 이미지 레이어에 복사되지 않게 한다.
+# 공개 빌드 값(VITE_*)은 .env 가 아니라 --build-arg 로 넘긴다.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+
+node_modules/
+build/
+dist/
+coverage/
+.vscode/
+.git/
+Dockerfile
+.dockerignore

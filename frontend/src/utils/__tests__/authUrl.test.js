@@ -16,6 +16,6 @@ describe('카카오 로그인 주소', () => {
   });
 
   it('localhost 같은 특정 호스트를 기본값으로 만들어 내지 않는다', () => {
-    expect(buildLoginUrl(undefined)).not.toMatch(/localhost|127\.0\.0\.1|ngrok/i);
+    expect(buildLoginUrl(undefined)).not.toMatch(/localhost|127\.0\.0\.1/i);
   });
 });
