@@ -9,6 +9,7 @@ import com.flatmap.navigation.service.TMapRouteService;
 import com.flatmap.navigation.service.WeatherService;
 import com.flatmap.navigation.support.CountingDataSource;
 import com.flatmap.navigation.support.IntegrationTest;
+import com.flatmap.navigation.walk.WalkMode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,8 @@ class RouteScoringIntegrationTest {
     RouteScorer scorer;
     @Autowired
     ScoreModel model;
+    @Autowired
+    com.flatmap.navigation.walk.WalkDifficultyService walkDifficulty;
 
     @BeforeEach
     @AfterEach
@@ -162,9 +165,9 @@ class RouteScoringIntegrationTest {
         Mockito.when(weather.getWeather(Mockito.anyDouble(), Mockito.anyDouble())).thenReturn(rain);
 
         SafeRouteService service = new SafeRouteService(tmap, counting, scorer, model, weather,
-                new SteepSlopeService(new SteepSlopeAreaRepository(new JdbcTemplate(dataSource))));
+                new SteepSlopeService(new SteepSlopeAreaRepository(new JdbcTemplate(dataSource))), walkDifficulty);
         counted.reset();
-        List<ScoredRoute> routes = service.findScoredRoutes(37.4, 127.1, 37.41, 127.1);
+        List<ScoredRoute> routes = service.findScoredRoutes(37.4, 127.1, 37.41, 127.1, WalkMode.GENERAL);
 
         assertThat(counted.count()).as("경로당 집계 쿼리 1회 (정점 수 무관, 날씨는 DB 를 쓰지 않는다)").isEqualTo(3);
         assertThat(routes).hasSize(3);

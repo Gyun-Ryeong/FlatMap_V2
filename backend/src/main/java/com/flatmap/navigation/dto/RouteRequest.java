@@ -6,6 +6,8 @@ public class RouteRequest {
     private double destLng;
     private double destLat;
     private String option;
+    /** 보행 유형(GENERAL/WEAK). 없으면 서버 기본값. */
+    private String walkMode;
 
     public double getOriginLng() { return originLng; }
     public void setOriginLng(double originLng) { this.originLng = originLng; }
@@ -15,6 +17,8 @@ public class RouteRequest {
     public void setDestLng(double destLng) { this.destLng = destLng; }
     public double getDestLat() { return destLat; }
     public void setDestLat(double destLat) { this.destLat = destLat; }
+    public String getWalkMode() { return walkMode; }
+    public void setWalkMode(String walkMode) { this.walkMode = walkMode; }
     public String getOption() { return option; }
     public void setOption(String option) { this.option = option; }
 }

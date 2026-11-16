@@ -5,6 +5,7 @@ import com.flatmap.navigation.dto.RiskSection;
 import com.flatmap.navigation.dto.RouteRequest;
 import com.flatmap.navigation.dto.RouteResponse;
 import com.flatmap.navigation.routescore.SafeRouteService;
+import com.flatmap.navigation.walk.WalkMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,7 +22,7 @@ import java.util.List;
  *   <li>우회 경유지를 만들 수 있다.</li>
  *   <li>T Map 이 경유지 포함 경로를 돌려준다(실패하면 원경로).</li>
  *   <li>경로 반경 안 급경사지(붕괴위험 경고 레이어) 구간 수가 원경로보다 <b>줄었다</b>.</li>
- *   <li>총점(A·C축)이 원경로보다 {@code detour.max-score-drop} 점 넘게 떨어지지 않았다.</li>
+ *   <li>총점(A·B·C축)이 원경로보다 {@code detour.max-score-drop} 점 넘게 떨어지지 않았다.</li>
  * </ol>
  * 급경사지는 점수에 섞지 않는다 — 우회의 목적(경고 구간 회피)과 점수(시설 노출·날씨)는 별개의 축이고,
  * 이 규칙이 둘이 서로 어긋나는 우회를 걸러낸다. 응답에는 항상 축별 breakdown 이 들어 있다.
@@ -52,8 +53,13 @@ public class DetourRouteService {
         this.maxScoreDrop = maxScoreDrop;
     }
 
-    /** 도보 경로 한 개 + 급경사지 구간 + 점수·날씨. */
+    /**
+     * 도보 경로 한 개 + 급경사지 구간 + 점수·날씨.
+     *
+     * @throws com.flatmap.navigation.walk.InvalidWalkModeException 보행 유형이 올바르지 않을 때(컨트롤러가 400 으로 바꾼다)
+     */
     public RouteResponse walk(RouteRequest request) {
+        WalkMode mode = WalkMode.parse(request.getWalkMode(), safeRouteService.defaultWalkMode());
         RouteResponse route = tmap.getWalkingRoute(
                 request.getOriginLng(), request.getOriginLat(),
                 request.getDestLng(), request.getDestLat(), request.getOption());
@@ -62,17 +68,19 @@ public class DetourRouteService {
         if (!risks.isEmpty()) {
             log.info("경로에서 붕괴위험 지정지 {}건 감지", risks.size());
         }
-        fill(route, risks, safeRouteService.evaluate(toLatLng(route)));
+        fill(route, risks, safeRouteService.evaluate(toLatLng(route), mode));
         return route;
     }
 
+    /** @throws com.flatmap.navigation.walk.InvalidWalkModeException 보행 유형이 올바르지 않을 때 */
     public RouteResponse detour(DetourRequest request) {
+        WalkMode mode = WalkMode.parse(request.getWalkMode(), safeRouteService.defaultWalkMode());
         // 1. 원래 경로 (경유지 계산과 우회 효과 비교의 기준)
         RouteResponse original = tmap.getWalkingRoute(
                 request.getOriginLng(), request.getOriginLat(),
                 request.getDestLng(), request.getDestLat(), request.getOption());
         List<RiskSection> originalRisks = steepSlopeService.findRiskSections(original.getCoords());
-        SafeRouteService.Evaluation originalEval = safeRouteService.evaluate(toLatLng(original));
+        SafeRouteService.Evaluation originalEval = safeRouteService.evaluate(toLatLng(original), mode);
 
         // 2. avoidPoints → 경유지
         List<RiskSection> avoid = new ArrayList<>();
@@ -110,7 +118,7 @@ public class DetourRouteService {
         }
 
         // 5. 점수가 허용 폭 넘게 떨어지지 않아야 한다
-        SafeRouteService.Evaluation detourEval = safeRouteService.evaluate(toLatLng(detour));
+        SafeRouteService.Evaluation detourEval = safeRouteService.evaluate(toLatLng(detour), mode);
         double drop = originalEval.score().totalScore() - detourEval.score().totalScore();
         if (drop > maxScoreDrop) {
             log.warn("우회 경로 점수가 허용 폭 넘게 낮음 ({} → {}, 허용 {}) — 원래 경로 반환",

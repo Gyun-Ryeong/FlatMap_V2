@@ -5,6 +5,7 @@ import com.flatmap.navigation.dto.DetourRequest;
 import com.flatmap.navigation.dto.RouteRequest;
 import com.flatmap.navigation.service.DetourRouteService;
 import com.flatmap.navigation.service.RouteProviderException;
+import com.flatmap.navigation.walk.InvalidWalkModeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -38,6 +39,8 @@ public class WalkRouteController {
                 request.getOption());
         try {
             return ResponseEntity.ok(routeService.walk(request));
+        } catch (InvalidWalkModeException e) {
+            return invalidWalkMode();
         } catch (RouteProviderException e) {
             log.error("도보 경로 검색 실패: {}", e.getMessage());
             return providerUnavailable();
@@ -52,10 +55,16 @@ public class WalkRouteController {
                 request.getAvoidPoints() != null ? request.getAvoidPoints().size() : 0);
         try {
             return ResponseEntity.ok(routeService.detour(request));
+        } catch (InvalidWalkModeException e) {
+            return invalidWalkMode();
         } catch (RouteProviderException e) {
             log.error("우회 경로 검색 실패: {}", e.getMessage());
             return providerUnavailable();
         }
+    }
+
+    private static ResponseEntity<?> invalidWalkMode() {
+        return ApiErrors.body(HttpStatus.BAD_REQUEST, "INVALID_WALK_MODE", "보행 유형이 올바르지 않습니다.");
     }
 
     private static ResponseEntity<?> providerUnavailable() {

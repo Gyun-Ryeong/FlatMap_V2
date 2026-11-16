@@ -26,9 +26,10 @@ public class ScoreModelConfig {
                           @Value("${score.route.min-length-km}") double minRouteKm,
                           @Value("${score.route.exposure-breakpoints}") String exposureBreakpoints,
                           @Value("${score.route.axis-weight.a}") double axisWeightA,
+                          @Value("${score.route.axis-weight.b}") double axisWeightB,
                           @Value("${score.route.axis-weight.c}") double axisWeightC) {
         return new ScoreModel(version, weights, radiusMeters, policeRadiusMeters, minRouteKm,
-                PiecewiseScale.parse(exposureBreakpoints), axisWeightA, axisWeightC);
+                PiecewiseScale.parse(exposureBreakpoints), axisWeightA, axisWeightB, axisWeightC);
     }
 
     @Bean

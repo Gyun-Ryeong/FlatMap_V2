@@ -136,6 +136,42 @@ class SafeRouteEndpointTest {
         org.assertj.core.api.Assertions.assertThat(scoreOfFirstRoute()).isEqualTo(scoreWithout);
     }
 
+    @Test
+    void walkModeParameterSelectsTheThresholdsAndAnUnknownOneIs400() throws Exception {
+        Mockito.when(tmap.getCandidateRoutes(Mockito.anyDouble(), Mockito.anyDouble(),
+                Mockito.anyDouble(), Mockito.anyDouble())).thenReturn(List.of(candidate(0, "일반", 800)));
+        // 경로(경도 127.1000, 위도 37.40~37.41)를 따라 4.0° 평지 격자(열 216, 행 245~295)
+        for (int j = 245; j <= 295; j++) {
+            jdbc.update("INSERT INTO walk_slope_cell (cell_i, cell_j, slope_deg) VALUES (216, ?, 4.0)", j);
+        }
+        try {
+            // 4.0° 는 일반에서는 양호, 보행약자에서는 주의
+            mvc.perform(get("/api/routes/safe" + QUERY + "&mode=general"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.scoreModel.walkMode").value("GENERAL"))
+                    .andExpect(jsonPath("$.routes[0].breakdown[1].axis").value("B"))
+                    .andExpect(jsonPath("$.routes[0].breakdown[1].score").value(100.0))
+                    .andExpect(jsonPath("$.routes[0].breakdown[1].detail.goodPercent").value(100.0));
+            mvc.perform(get("/api/routes/safe" + QUERY + "&mode=WEAK"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.scoreModel.walkMode").value("WEAK"))
+                    .andExpect(jsonPath("$.routes[0].breakdown[1].score").value(50.0))
+                    .andExpect(jsonPath("$.routes[0].breakdown[1].detail.cautionPercent").value(100.0));
+            // 모드를 안 주면 서버 기본값(GENERAL)
+            mvc.perform(get("/api/routes/safe" + QUERY))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.scoreModel.walkMode").value("GENERAL"));
+            // 모르는 값은 400, 외부 호출 없이
+            Mockito.clearInvocations(tmap);
+            mvc.perform(get("/api/routes/safe" + QUERY + "&mode=fast"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_WALK_MODE"));
+            Mockito.verifyNoInteractions(tmap);
+        } finally {
+            jdbc.update("DELETE FROM walk_slope_cell");
+        }
+    }
+
     private double scoreOfFirstRoute() throws Exception {
         String body = mvc.perform(get("/api/routes/safe" + QUERY)).andReturn().getResponse().getContentAsString();
         return com.jayway.jsonpath.JsonPath.<Number>read(body, "$.routes[0].totalScore").doubleValue();
@@ -150,10 +186,18 @@ class SafeRouteEndpointTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.scoreModel.kind").value("DESIGN_PARAMETER"))
                 .andExpect(jsonPath("$.scoreModel.axes[0]").value("A"))
-                .andExpect(jsonPath("$.scoreModel.axes[1]").value("C"))
-                .andExpect(jsonPath("$.scoreModel.axes.length()").value(2))
+                .andExpect(jsonPath("$.scoreModel.axes[1]").value("B"))
+                .andExpect(jsonPath("$.scoreModel.axes[2]").value("C"))
+                .andExpect(jsonPath("$.scoreModel.axes.length()").value(3))
                 .andExpect(jsonPath("$.scoreModel.note").value(containsString("위험도나 안전도가 아닙니다")))
-                .andExpect(jsonPath("$.scoreModel.note").value(containsString("보행난이도(B)는 아직 반영하지 않습니다")));
+                .andExpect(jsonPath("$.scoreModel.note").value(containsString("실제 경사보다 낮게")))
+                .andExpect(jsonPath("$.scoreModel.note").value(not(containsString("아직 반영하지 않습니다"))))
+                // 보행 유형별 임계값(각도 °)은 서버 설정을 그대로 내려 준다
+                .andExpect(jsonPath("$.scoreModel.walkMode").value("GENERAL"))
+                .andExpect(jsonPath("$.scoreModel.walkThresholds.WEAK.goodMaxDeg").value(3.18))
+                .andExpect(jsonPath("$.scoreModel.walkThresholds.WEAK.cautionMaxDeg").value(4.76))
+                .andExpect(jsonPath("$.scoreModel.walkThresholds.GENERAL.goodMaxDeg").value(4.76))
+                .andExpect(jsonPath("$.scoreModel.walkThresholds.GENERAL.cautionMaxDeg").value(7.13));
     }
 
     @Test

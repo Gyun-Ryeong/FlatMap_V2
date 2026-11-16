@@ -42,7 +42,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/favorites/**").authenticated()
                         // 조회(GET)는 공개. 데이터 수집·갱신·삭제 등 쓰기 계열은 관리용(X-Admin-Api-Key)만 허용한다.
                         .requestMatchers(HttpMethod.GET, "/api/safety/**", "/api/steep-slope/**", "/api/density-grid/**").permitAll()
-                        .requestMatchers("/api/safety/**", "/api/steep-slope/**", "/api/data/**", "/api/density-grid/**").hasRole("ADMIN")
+                        .requestMatchers("/api/safety/**", "/api/steep-slope/**", "/api/data/**", "/api/density-grid/**", "/api/walk-difficulty/**").hasRole("ADMIN")
                         .anyRequest().permitAll()
                 )
                 // 인증 정보 없음 → 401, 인증은 됐으나 권한 없음 → 403
