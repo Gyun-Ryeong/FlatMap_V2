@@ -2,6 +2,44 @@
 
 > 단계 번호: 아래 "1단계 — 통합 스키마…" 는 로드맵의 00(foundation) 이다. 로드맵 01(ingestion)은 이 문서 맨 위 항목이다.
 
+## 07 단계 — 품질과 문서 (quality-docs) (2026-11-17) — 구현·로컬 검증 완료, GitHub Actions 실행은 push 후 확인 필요
+
+CI, 핵심 로직 테스트 보강, README, 저장소 위생 점검을 마쳤다. **점수는 검증되지 않은 설계 파라미터이며 위험도·안전도가 아니다.** RAG 는 개발 중이며 아직 연동되지 않았다.
+
+### 추가됨
+
+- **GitHub Actions CI**(`.github/workflows/ci.yml`, 모든 push·PR): ① 백엔드 — PostGIS 서비스 컨테이너(`postgis/postgis:16-3.4`, DB 이름 `flatmapv2_test`)와 JDK 17 에서 `./mvnw verify`, `TEST_DB_*` 는 CI 안에서만 쓰는 가짜 값 ② 프론트 — Node 22 에서 `npm ci` → `npm test`(Vitest) → `npm run build`(Vite) ③ 저장소 위생 점검. 비밀값은 저장소에 없고 Secrets 도 쓰지 않는다.
+- **저장소 위생 점검 스크립트**(`scripts/check-repo-hygiene.sh`, CI 에서도 실행): 대용량 추적 파일(1MiB 초과, 이유를 적은 허용 목록 1건), 올라가면 안 되는 이름의 추적 파일(`.env`·키·덤프·DEM·`application-local.*`), 비밀값 패턴, 그리고 로컬에 `.env`/`application-local.properties` 가 있을 때 이름이 KEY/SECRET/TOKEN/PASSWORD 인 값(8자 이상)의 **정확 일치**를 추적 파일과 전체 git 이력에서 검색한다. 값은 어디에도 출력하지 않고 키 이름·파일 경로·커밋 해시만 알린다. 임시 저장소에 일부러 새는 상황(큰 파일, 키 파일명, AWS 키 형태, 비밀번호 대입문, 값이 든 추적 파일, 삭제된 파일 이력)을 만들어 모두 잡고 종료 코드 1 을 내는지 확인했다.
+- **README.md**: 아키텍처 다이어그램(Mermaid, `mermaid.parse` 로 문법 검증), 구현된 기능만의 목록, 점수 모델·DEM 30m 평활화·급경사지 한계, RAG 개발 중 표기, 로컬 실행 방법(`.env` 키 이름, Docker Compose 또는 로컬 PostgreSQL, 테스트 DB), 스크린샷 자리 표시(파일 이름만 정해 둠, 이미지는 사용자가 추가), `[이름 미정]` 표시, 알려진 한계.
+- **테스트 보강**(백엔드 358 → 391개, 프론트 78 → 88개): JWT 발급·검증(위조·만료·alg=none·약한 키), 로그인 쿠키 인증과 **사용자 간 즐겨찾기 격리**(다른 사용자의 것을 보거나 지울 수 없음, 404), 카카오 로그인 흐름(실패해도 내부 메시지가 새지 않음), 거리 계산(haversine)과 기상청 격자 변환(공개 격자표 값), 성남 범위 필터 경계, 최근 검색 기록, 경로 오류 문구. 격리 테스트는 컨트롤러를 일부러 깨뜨려(소유자 조건 제거) 실패하는 것을 확인한 뒤 원복했다.
+
+### 변경됨
+
+- **Maven wrapper 를 `only-script` 방식으로 교체**: `.gitignore` 로 jar 를 제외해 둔 상태에서 구형 `mvnw` 는 새 clone 에서 `ClassNotFoundException: MavenWrapperMain` 으로 실행되지 않았다(README 와 CI 의 `./mvnw` 가 깨지는 문제). jar 없이 스크립트가 Maven 을 내려받는 방식으로 바꿨고, `.gitattributes` 로 `mvnw` 는 LF, `mvnw.cmd` 는 CRLF 로 고정했다.
+
+### 저장소 위생 점검 결과 (2026-11-17)
+
+| 항목 | 결과 |
+|---|---|
+| 추적 파일 / 커밋 / 브랜치 | 262개 / 28개 / 9개(전 브랜치 이력 검색) |
+| 비밀값 정확 일치(`.env`·`application-local.properties` 의 KEY/SECRET/TOKEN/PASSWORD 이름 값 18개) | 추적 파일 0건, git 이력 0건 |
+| 비밀값 패턴(개인 키 블록, AWS·GitHub·Slack 토큰, 20자 이상 리터럴 대입) | 0건 (테스트용 가짜 값 `test-only…`·`…should-never-leak` 는 이름으로 구분해 제외) |
+| 올라가면 안 되는 이름의 추적 파일(`.env`, 키·인증서, 덤프, `.tif`, `application-local.*`) | 0건 |
+| 1MiB 초과 추적 파일 | 허용 목록 1건: 행정안전부 급경사지 현황 CSV(2.4MB, 공개 데이터이며 `CsvImportService` 가 리소스로 읽음). 그 밖 0건 |
+
+### 검증 (로컬에서 CI 와 같은 명령)
+
+- `.env` 없이 **새로 clone 한 작업 트리**(`git worktree`)에서 `TEST_DB_*` 환경변수만 주고 `./mvnw -B -ntp verify` → 391개 통과(1개 건너뜀: 실제 DEM 파일이 있을 때만 도는 대조 테스트), jar 생성. `npm ci` → `npm test` 88개 통과 → `npm run build` 성공, 위생 점검 0건.
+- 워크플로 YAML 은 파서로 읽어 잡(backend/frontend/hygiene), 서비스 이미지, 테스트 DB 이름이 `_test` 로 끝남을 확인했다.
+
+### 한계 / 후속
+
+- **GitHub Actions 는 아직 실제로 돌려 보지 못했다**(원격 push 전). 위의 로컬 재현으로 대신했고, 원격에서 실패하면 다음 보고에 포함한다.
+- CI 는 JDK 17 · PostgreSQL 16(PostGIS 3.4)을 쓰지만 이 PC 는 JDK 25 · PostgreSQL 18 이라 그 조합은 로컬에서 돌려 보지 못했다(프로젝트는 `--release 17` 로 컴파일되어 API 범위는 17 로 제한된다). Docker 가 없어 `docker-compose.yml` 도 실행해 보지 못했다.
+- 위생 점검의 패턴 검색은 정규식 기반이라 모든 비밀값 형태를 잡지는 못한다. 정확 일치 검색은 로컬에 값이 있는 키(이름에 KEY/SECRET/TOKEN/PASSWORD 가 든 것)만 대상이다. DB 사용자 이름·URL 은 비밀값으로 취급하지 않았다.
+- 프론트 테스트는 순수 함수와 정적 렌더(문구) 중심이며 지도 오버레이와 훅은 자동 테스트가 없다. README 의 Mermaid 다이어그램이 GitHub 에서 그려지는 모습과 스크린샷은 확인하지 못했다(스크린샷은 사용자가 추가).
+- 01 단계의 미해결 2건(성남시 CCTV 활용 신청, 보안등 전체 수집)은 그대로이며 README 의 알려진 한계에 적었다.
+
 ## 06b 단계 — FlatMap 정렬 (우회 점수 규칙 삭제 · 오르막 최소 옵션 · 안전정보 레이어 복원) (2026-11-17) — 구현·자동 테스트 완료, 지도 화면은 사용자 확인 필요
 
 기반은 FlatMap 이고 SafetyRoad 는 UI 뼈대라는 방향에 맞춰, 앞 단계에서 제가 판단해 바꾼 부분 중 FlatMap 과 어긋난 것을 정리했다.
