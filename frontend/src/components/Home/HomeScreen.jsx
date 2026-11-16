@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import KakaoMap from '../KakaoMap';
 import { SERVICE_NAME, SERVICE_TAGLINE } from '../../config/branding';
 
-// 구현된 기능만 적는다. (보행난이도·보행약자 모드, RAG 기반 안내는 개발 중이라 단계 설명에 넣지 않는다.)
+// 구현된 기능만 적는다. (RAG 기반 안내는 개발 중이라 단계 설명에 넣지 않는다.)
 const STEPS = [
   { number: '1', title: '장소 입력', text: '출발지와 목적지를 검색하거나 지도에서 직접 고릅니다.', detail: '현재 위치를 출발지로 바로 사용할 수 있어요.' },
-  { number: '2', title: '이동 기준 선택', text: '안전 우선, 균형, 빠른 길 중에서 고릅니다.', detail: '후보 경로는 서버가 3종류를 한 번에 계산해 줍니다.' },
-  { number: '3', title: '경로 점수 비교', text: '야간 시설(CCTV·보안등·경찰시설)과 날씨를 반영한 점수로 비교합니다.', detail: '점수는 설계 파라미터 기반의 상대 비교 값이며, 축별 내역을 함께 보여 줍니다.' },
+  { number: '2', title: '이동 기준 선택', text: '안전 우선, 균형, 빠른 길 중에서 고르고, 보행 유형(일반 / 보행약자)을 정합니다.', detail: '후보 경로는 서버가 3종류를 한 번에 계산해 줍니다.' },
+  { number: '3', title: '경로 점수 비교', text: '야간 시설(CCTV·보안등·경찰시설), 경로 경사(보행난이도), 날씨를 반영한 점수로 비교합니다.', detail: '점수는 설계 파라미터 기반의 상대 비교 값이며, 축별 내역을 함께 보여 줍니다.' },
   { number: '4', title: '경고 확인과 우회', text: '경로 주변의 붕괴위험 지정 급경사지를 지도에서 확인합니다.', detail: '경고 구간이 있으면 피해 가는 우회 경로를 요청할 수 있어요.' },
 ];
 
@@ -190,7 +190,7 @@ export default function HomeScreen({ onStart }) {
           <button onClick={() => moveStep(1)} disabled={activeStep === STEPS.length - 1} aria-label="다음 이용 단계">›</button>
         </div>
         <p className="home-dev-note">
-          개발 중(아직 제공하지 않음): 경사 기반 보행난이도와 보행약자·일반 모드, RAG 기반 안내.
+          개발 중(아직 제공하지 않음): RAG 기반 안내.
         </p>
       </section>
     </main>

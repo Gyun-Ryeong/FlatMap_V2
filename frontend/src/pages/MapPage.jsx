@@ -29,6 +29,7 @@ import {
   getSearchHistory, addSearchHistory, removeSearchHistory, clearSearchHistory,
 } from '../utils/searchHistory';
 import { pickRouteByPriority, PRIORITY_OPTIONS } from '../utils/routePriority';
+import { loadWalkMode, saveWalkMode, walkModeLabel } from '../utils/walkMode';
 
 const DEFAULT_LAYERS = { CCTV: true, SECURITY_LIGHT: true, POLICE: true, DENSITY: false, STEEP: false };
 const DEFAULT_CENTER = { lat: 37.4201, lng: 127.1265 }; // 성남시청 (위치를 못 얻을 때의 날씨 기준점)
@@ -48,6 +49,7 @@ export default function MapPage({ onHome }) {
   const [selectedRouteId, setSelectedRouteId] = useState(null);
   const [resultsMode, setResultsMode] = useState(false);
   const [priority, setPriority] = useState('safety');
+  const [walkMode, setWalkMode] = useState(loadWalkMode);
   const [layers, setLayers] = useState(DEFAULT_LAYERS);
   const [facilityTruncated, setFacilityTruncated] = useState(false);
   const [bounds, setBounds] = useState(null);
@@ -70,7 +72,9 @@ export default function MapPage({ onHome }) {
   const { notice: densityNotice, dismiss: dismissDensityNotice } = useDensityNotice(currentLocation);
   const { isLoggedIn, favorites, isFavorited, add: addFavorite, remove: removeFavorite } = useFavorites();
   const selectedRoute = (routes ?? []).find((r) => r.routeId === selectedRouteId) ?? null;
-  const { detour, requestDetour } = useDetour(selectedRoute, origin, destination);
+  // 화면의 경로 점수는 검색 시점의 보행 유형으로 계산된 것이다 — 우회 비교도 서버가 알려 준 그 유형을 쓴다.
+  const resultWalkMode = scoreModel?.walkMode ?? walkMode;
+  const { detour, requestDetour } = useDetour(selectedRoute, origin, destination, resultWalkMode);
 
   // 지도 위 날씨 칩: 첫 위치(없으면 기본 위치) 기준으로 한 번만 조회한다. 경로별 날씨는 경로 응답에 들어 있다.
   useEffect(() => {
@@ -199,7 +203,12 @@ export default function MapPage({ onHome }) {
     setSelectedRouteId(null);
     setResultsMode(false);
     setSheetExpanded(true);
-    fetchRoutes(origin, destination);
+    fetchRoutes(origin, destination, walkMode);
+  };
+
+  const handleChangeWalkMode = (mode) => {
+    setWalkMode(mode);
+    saveWalkMode(mode);
   };
 
   // 결과 화면에서 조건 입력 화면으로 돌아간다 (출발/도착 지점은 유지)
@@ -330,7 +339,7 @@ export default function MapPage({ onHome }) {
                   onPick={handlePickShortcut}
                 />
 
-                <RouteOptions priority={priority} onChangePriority={setPriority} />
+                <RouteOptions priority={priority} onChangePriority={setPriority} walkMode={walkMode} onChangeWalkMode={handleChangeWalkMode} />
 
                 <button className="search-submit" onClick={handleSearch} disabled={!canSearch}>
                   {loading ? '경로를 찾는 중...' : '경로 찾기'}
@@ -346,6 +355,7 @@ export default function MapPage({ onHome }) {
               <div className="applied-conditions">
                 <div className="applied-conditions-title">적용된 탐색 조건</div>
                 <span className="applied-conditions-chip">{priorityLabel}</span>
+                <span className="applied-conditions-chip">보행 유형: {walkModeLabel(resultWalkMode)}</span>
               </div>
 
               <RouteResult

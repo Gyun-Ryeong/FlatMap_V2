@@ -11,13 +11,15 @@ export function canRequestDetour(route) {
   return !!route && Array.isArray(route.riskSections) && route.riskSections.length > 0;
 }
 
-export function buildDetourRequest(route, origin, destination) {
+// walkMode: 원경로 점수를 낸 보행 유형. 우회 경로도 같은 유형으로 점수를 비교해야 한다.
+export function buildDetourRequest(route, origin, destination, walkMode) {
   return {
     originLat: origin.lat,
     originLng: origin.lng,
     destLat: destination.lat,
     destLng: destination.lng,
     option: detourOptionFor(route.searchOptionCode),
+    walkMode,
     avoidPoints: route.riskSections.map((rs) => ({
       lat: rs.lat,
       lng: rs.lng,

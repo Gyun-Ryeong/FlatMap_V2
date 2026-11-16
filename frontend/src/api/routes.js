@@ -1,13 +1,14 @@
 import axiosInstance from './axiosInstance';
 
-// GET /api/routes/safe → { routes[], scoreModel }
-export async function fetchSafeRoutes(origin, destination) {
+// GET /api/routes/safe → { routes[], scoreModel }. mode: 보행 유형(GENERAL/WEAK, 보행난이도 B축 임계값)
+export async function fetchSafeRoutes(origin, destination, walkMode) {
   const res = await axiosInstance.get('/routes/safe', {
     params: {
       startLat: origin.lat,
       startLng: origin.lng,
       endLat: destination.lat,
       endLng: destination.lng,
+      mode: walkMode,
     },
   });
   return res.data;
