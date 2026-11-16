@@ -5,6 +5,7 @@ import KakaoMap from '../components/KakaoMap';
 import SearchBar from '../components/SearchBar';
 import RouteOptions from '../components/Panel/RouteOptions';
 import LayerPanel from '../components/Panel/LayerPanel';
+import SteepSlopeList from '../components/Panel/SteepSlopeList';
 import PlaceShortcuts from '../components/Panel/PlaceShortcuts';
 import ScoreGuide from '../components/Panel/ScoreGuide';
 import RouteResult from '../components/Route/RouteResult';
@@ -14,6 +15,7 @@ import RouteOverlay from '../components/Map/RouteOverlay';
 import FacilityOverlay from '../components/Map/FacilityOverlay';
 import DensityOverlay from '../components/Map/DensityOverlay';
 import SteepSlopeOverlay from '../components/Map/SteepSlopeOverlay';
+import ZoneOverlay from '../components/Map/ZoneOverlay';
 import FavoriteOverlay from '../components/Map/FavoriteOverlay';
 import LocationOverlay from '../components/Map/LocationOverlay';
 import PointOverlay from '../components/Map/PointOverlay';
@@ -30,8 +32,12 @@ import {
 } from '../utils/searchHistory';
 import { pickRouteByPriority, PRIORITY_OPTIONS } from '../utils/routePriority';
 import { loadWalkMode, saveWalkMode, walkModeLabel } from '../utils/walkMode';
+import { ZONE_KEYS } from '../utils/zoneLayers';
 
-const DEFAULT_LAYERS = { CCTV: true, SECURITY_LIGHT: true, POLICE: true, DENSITY: false, STEEP: false };
+const DEFAULT_LAYERS = {
+  CCTV: true, SECURITY_LIGHT: true, POLICE: true, DENSITY: false, STEEP: false,
+  ACCIDENT: false, PROTECTED: false, WELFARE: false, SHELTER: false, SENIOR: false,
+};
 const DEFAULT_CENTER = { lat: 37.4201, lng: 127.1265 }; // 성남시청 (위치를 못 얻을 때의 날씨 기준점)
 const FACILITY_KEYS = ['CCTV', 'SECURITY_LIGHT', 'POLICE'];
 const BOUNDS_DEBOUNCE_MS = 500;
@@ -57,6 +63,7 @@ export default function MapPage({ onHome }) {
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const [sosOpen, setSosOpen] = useState(false);
   const [steepCount, setSteepCount] = useState(null);
+  const [zoneCounts, setZoneCounts] = useState({});
   const [history, setHistory] = useState(getSearchHistory);
   const [mapWeather, setMapWeather] = useState(null);
 
@@ -234,6 +241,25 @@ export default function MapPage({ onHome }) {
     setLayers((current) => ({ ...current, [key]: !current[key] }));
   };
 
+  const handleToggleAllZones = () => {
+    setLayers((current) => {
+      const allOn = ZONE_KEYS.every((k) => current[k]);
+      return { ...current, ...Object.fromEntries(ZONE_KEYS.map((k) => [k, !allOn])) };
+    });
+  };
+
+  const handleZoneLoaded = useCallback((key, count) => {
+    setZoneCounts((current) => ({ ...current, [key]: count }));
+  }, []);
+
+  // 오르막길 구간 목록에서 항목을 누르면 그 위치로 이동하고 급경사지 경고 레이어를 켠다.
+  const handlePickSteep = (item) => {
+    if (!map || item.latitude == null || item.longitude == null) return;
+    map.setCenter(new window.kakao.maps.LatLng(item.latitude, item.longitude));
+    map.setLevel(3);
+    setLayers((current) => ({ ...current, STEEP: true }));
+  };
+
   const handleToggleAllFacilities = () => {
     setLayers((current) => {
       const allOn = FACILITY_KEYS.every((k) => current[k]);
@@ -373,10 +399,14 @@ export default function MapPage({ onHome }) {
             layers={layers}
             onToggle={handleToggleLayer}
             onToggleAllFacilities={handleToggleAllFacilities}
+            onToggleAllZones={handleToggleAllZones}
             zoom={zoom}
             facilityTruncated={facilityTruncated}
             steepCount={steepCount}
+            zoneCounts={zoneCounts}
           />
+
+          <SteepSlopeList onPick={handlePickSteep} />
 
           <ScoreGuide scoreModel={scoreModel} />
         </div>
@@ -391,6 +421,7 @@ export default function MapPage({ onHome }) {
       <FacilityOverlay map={map} layers={layers} bounds={bounds} zoom={zoom} onTruncated={setFacilityTruncated} />
       <DensityOverlay map={map} enabled={layers.DENSITY} bounds={bounds} zoom={zoom} />
       <SteepSlopeOverlay map={map} enabled={layers.STEEP} onLoaded={setSteepCount} />
+      <ZoneOverlay map={map} layers={layers} bounds={bounds} zoom={zoom} onLoaded={handleZoneLoaded} />
       <FavoriteOverlay map={map} favorites={favorites} />
       <LocationOverlay map={map} location={currentLocation} />
       <PointOverlay map={map} point={origin} type="origin" />
