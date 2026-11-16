@@ -8,7 +8,6 @@ import com.flatmap.navigation.routescore.SafeRouteService;
 import com.flatmap.navigation.walk.WalkMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -22,10 +21,10 @@ import java.util.List;
  *   <li>우회 경유지를 만들 수 있다.</li>
  *   <li>T Map 이 경유지 포함 경로를 돌려준다(실패하면 원경로).</li>
  *   <li>경로 반경 안 급경사지(붕괴위험 경고 레이어) 구간 수가 원경로보다 <b>줄었다</b>.</li>
- *   <li>총점(A·B·C축)이 원경로보다 {@code detour.max-score-drop} 점 넘게 떨어지지 않았다.</li>
  * </ol>
- * 급경사지는 점수에 섞지 않는다 — 우회의 목적(경고 구간 회피)과 점수(시설 노출·날씨)는 별개의 축이고,
- * 이 규칙이 둘이 서로 어긋나는 우회를 걸러낸다. 응답에는 항상 축별 breakdown 이 들어 있다.
+ * 이 채택 기준은 FlatMap 원래 동작과 같다. 점수(A·B·C축)는 채택 여부에 쓰지 않는다 — 우회의 목적(경고 구간 회피)과
+ * 점수(시설 노출·경사·날씨)는 별개의 축이다. 대신 응답에 원경로 점수({@code originalTotalScore})와 우회 경로 점수
+ * ({@code totalScore})·축별 breakdown 을 함께 실어 화면이 변화를 그대로 보여 준다(점수가 낮아져도 숨기지 않는다).
  *
  * <p>원경로 조회에 실패하면 {@link RouteProviderException} 이 그대로 올라간다(컨트롤러가 일반화된 502 로 바꾼다).
  */
@@ -38,19 +37,13 @@ public class DetourRouteService {
     private final SteepSlopeService steepSlopeService;
     private final DetourService detourService;
     private final SafeRouteService safeRouteService;
-    private final double maxScoreDrop;
 
     public DetourRouteService(TMapRouteService tmap, SteepSlopeService steepSlopeService,
-                              DetourService detourService, SafeRouteService safeRouteService,
-                              @Value("${detour.max-score-drop}") double maxScoreDrop) {
-        if (maxScoreDrop < 0) {
-            throw new IllegalArgumentException("detour.max-score-drop 은 0 이상이어야 한다.");
-        }
+                              DetourService detourService, SafeRouteService safeRouteService) {
         this.tmap = tmap;
         this.steepSlopeService = steepSlopeService;
         this.detourService = detourService;
         this.safeRouteService = safeRouteService;
-        this.maxScoreDrop = maxScoreDrop;
     }
 
     /**
@@ -117,15 +110,8 @@ public class DetourRouteService {
                     "더 안전한 우회 경로를 찾지 못해 원래 경로를 반환했습니다.");
         }
 
-        // 5. 점수가 허용 폭 넘게 떨어지지 않아야 한다
+        // 5. 채택. 점수는 채택 여부에 쓰지 않고 화면에 비교로 보여 주기 위해서만 계산한다(원경로와 같은 보행 유형).
         SafeRouteService.Evaluation detourEval = safeRouteService.evaluate(toLatLng(detour), mode);
-        double drop = originalEval.score().totalScore() - detourEval.score().totalScore();
-        if (drop > maxScoreDrop) {
-            log.warn("우회 경로 점수가 허용 폭 넘게 낮음 ({} → {}, 허용 {}) — 원래 경로 반환",
-                    originalEval.score().totalScore(), detourEval.score().totalScore(), maxScoreDrop);
-            return original(original, originalRisks, originalEval,
-                    "우회 경로는 붕괴위험 지정지를 줄이지만 점수가 크게 낮아져 원래 경로를 반환했습니다.");
-        }
 
         fill(detour, detourRisks, detourEval);
         detour.setOriginalTotalScore(originalEval.score().totalScore());

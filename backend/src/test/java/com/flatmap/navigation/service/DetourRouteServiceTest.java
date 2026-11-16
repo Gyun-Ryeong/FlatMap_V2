@@ -34,7 +34,6 @@ import static org.mockito.Mockito.when;
  */
 class DetourRouteServiceTest {
 
-    private static final double MAX_DROP = 10.0;
 
     private TMapRouteService tmap;
     private SteepSlopeService steep;
@@ -82,7 +81,7 @@ class DetourRouteServiceTest {
         steep = mock(SteepSlopeService.class);
         detour = mock(DetourService.class);
         safeRoute = mock(SafeRouteService.class);
-        service = new DetourRouteService(tmap, steep, detour, safeRoute, MAX_DROP);
+        service = new DetourRouteService(tmap, steep, detour, safeRoute);
 
         original = route(37.4000, 1800);
         detoured = route(37.3964, 2300);
@@ -144,28 +143,17 @@ class DetourRouteServiceTest {
     }
 
     @Test
-    void scoreDropExactlyAtTheToleranceStillAcceptsTheDetour() {
-        scores(70.0, 60.0);     // 정확히 10점 하락 = 허용 폭
+    void scoreDoesNotDecideAdoptionSoALowerScoredDetourIsStillReturnedWithBothScores() {
+        // 우회의 채택 기준은 급경사지 경고 구간 감소뿐이다(FlatMap 원래 동작). 점수가 많이 낮아져도 숨기지 않고 둘 다 알려 준다.
+        scores(70.0, 20.0);     // 50점 하락
 
         RouteResponse r = service.detour(request());
 
         assertThat(r.isDetourApplied()).isTrue();
-        assertThat(r.getTotalScore()).isEqualTo(60.0);
+        assertThat(r.getTotalScore()).isEqualTo(20.0);
         assertThat(r.getOriginalTotalScore()).isEqualTo(70.0);
-    }
-
-    @Test
-    void scoreDropBeyondTheToleranceReturnsTheOriginal() {
-        scores(70.0, 59.9);     // 10.1점 하락 → 허용 폭 초과
-
-        RouteResponse r = service.detour(request());
-
-        assertThat(r).isSameAs(original);
-        assertThat(r.isDetourApplied()).isFalse();
-        assertThat(r.getDetourMessage()).contains("점수가 크게 낮아져");
-        assertThat(r.getTotalScore()).isEqualTo(70.0);
-        assertThat(r.getOriginalTotalScore()).isEqualTo(70.0);
-        assertThat(r.getRiskSections()).hasSize(2);
+        assertThat(r.getRiskSections()).isEmpty();
+        assertThat(r.getDetourMessage()).isNull();
     }
 
     @Test
@@ -177,20 +165,6 @@ class DetourRouteServiceTest {
         assertThat(r.isDetourApplied()).isTrue();
         assertThat(r.getTotalScore()).isEqualTo(80.0);
         assertThat(r.getOriginalTotalScore()).isEqualTo(50.0);
-    }
-
-    @Test
-    void toleranceIsAConstructorParameterNotAConstant() {
-        scores(70.0, 59.9);
-        DetourRouteService lenient = new DetourRouteService(tmap, steep, detour, safeRoute, 15.0);
-
-        assertThat(lenient.detour(request()).isDetourApplied()).isTrue();
-    }
-
-    @Test
-    void negativeToleranceIsRejected() {
-        assertThatThrownBy(() -> new DetourRouteService(tmap, steep, detour, safeRoute, -1))
-                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

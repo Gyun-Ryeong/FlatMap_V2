@@ -76,6 +76,20 @@ describe('경로 카드·상세 렌더', () => {
     expect(html).toContain('점수 74.6 → 70.1');
   });
 
+  it('우회 경로 점수가 원경로보다 낮으면 숨기지 않고 알린다(점수는 채택 기준이 아님)', () => {
+    const lower = {
+      status: 'done',
+      message: '',
+      data: { totalDistance: 2800, totalDuration: 2000, riskSections: [], totalScore: 50, originalTotalScore: 74.6 },
+    };
+    const html = renderToStaticMarkup(<RouteDetail route={route} detour={lower} onRequestDetour={() => {}} />);
+    expect(html).toContain('점수 74.6 → 50.0');
+    expect(html).toContain('24.6점 낮습니다');
+    expect(html).toContain('채택 기준이 아니므로');
+    const higher = { ...lower, data: { ...lower.data, totalScore: 80 } };
+    expect(renderToStaticMarkup(<RouteDetail route={route} detour={higher} onRequestDetour={() => {}} />)).not.toContain('낮습니다');
+  });
+
   it('우회 거절 사유는 서버 문구 그대로 보여 준다', () => {
     const html = renderToStaticMarkup(
       <RouteDetail route={route} detour={{ status: 'rejected', data: null, message: '더 안전한 우회 경로를 찾지 못했습니다.' }} onRequestDetour={() => {}} />
