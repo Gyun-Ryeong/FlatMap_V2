@@ -8,6 +8,7 @@ import LayerPanel from '../components/Panel/LayerPanel';
 import SteepSlopeList from '../components/Panel/SteepSlopeList';
 import PlaceShortcuts from '../components/Panel/PlaceShortcuts';
 import ScoreGuide from '../components/Panel/ScoreGuide';
+import RagEntry from '../components/Panel/RagEntry';
 import RouteResult from '../components/Route/RouteResult';
 import RouteDetail from '../components/Route/RouteDetail';
 import WeatherMini from '../components/Weather/WeatherMini';
@@ -409,6 +410,9 @@ export default function MapPage({ onHome }) {
           <SteepSlopeList onPick={handlePickSteep} />
 
           <ScoreGuide scoreModel={scoreModel} />
+
+          {/* RAG 는 개발 중: 서버가 켜짐+연결됨일 때만 보인다(기본은 아무것도 렌더하지 않음) */}
+          <RagEntry />
         </div>
       </div>
 
