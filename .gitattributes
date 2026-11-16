@@ -1,2 +1,6 @@
 # 컨테이너 안에서 실행되는 셸 스크립트는 CRLF 면 깨진다.
 *.sh text eol=lf
+
+# Maven wrapper: 셸 스크립트는 LF 여야 Linux(CI)에서 실행된다. .cmd 는 CRLF.
+backend/mvnw text eol=lf
+backend/mvnw.cmd text eol=crlf
