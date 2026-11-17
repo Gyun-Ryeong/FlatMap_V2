@@ -33,8 +33,8 @@
   color: #4f5662; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
 }
 .sos-button {
-  min-height: 44px; padding: 8px 18px; background: #b84242; border: none; border-radius: 10px;
-  color: white; font-size: 16px; font-weight: 800; cursor: pointer; box-shadow: 0 3px 8px rgba(184, 66, 66, 0.28);
+  min-height: 44px; padding: 8px 18px; background: #c05252; border: none; border-radius: 10px;
+  color: white; font-size: 16px; font-weight: 800; cursor: pointer; box-shadow: 0 2px 6px rgba(192, 82, 82, 0.18);
 }
 
 /* 좌측 패널 */

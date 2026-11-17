@@ -2,7 +2,7 @@
 
 /* 계정 */
 .kakao-login-btn {
-  min-height: 40px; padding: 7px 12px; border: 0; border-radius: 9px; background: #fee500; color: #191919;
+  min-height: 40px; padding: 7px 12px; border: 0; border-radius: 9px; background: #f7e978; color: #191919;
   font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit;
 }
 .kakao-user-info { display: flex; align-items: center; gap: 8px; }

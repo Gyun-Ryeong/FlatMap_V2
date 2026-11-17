@@ -103,7 +103,7 @@ export default function HomeScreen({ onStart }) {
           <div className="home-brand-mark">
             <svg width={23} height={23} viewBox="0 0 14 14" fill="none" aria-hidden="true">
               <path d="M7 1C4.8 1 3 2.8 3 5C3 8 7 13 7 13S11 8 11 5C11 2.8 9.2 1 7 1Z" fill="white" />
-              <circle cx={7} cy={5} r={1.5} fill="#527dbf" />
+              <circle cx={7} cy={5} r={1.5} fill="#3f7655" />
             </svg>
           </div>
           <span>{SERVICE_NAME}</span>

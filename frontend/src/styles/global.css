@@ -95,8 +95,8 @@ input {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #527dbf, #7259ac);
-  box-shadow: 0 6px 18px rgba(82, 125, 191, 0.24);
+  background: linear-gradient(135deg, #5b9a76, #3f7655);
+  box-shadow: 0 6px 18px rgba(63, 118, 85, 0.2);
 }
 
 .home-header-note {
@@ -162,9 +162,9 @@ input {
   padding: 0 24px;
   border: 0;
   border-radius: 14px;
-  background: #3f7655;
+  background: #4f7f62;
   color: white;
-  box-shadow: 0 10px 24px rgba(63, 118, 85, 0.24);
+  box-shadow: 0 8px 20px rgba(79, 127, 98, 0.16);
   font-size: 18px;
   font-weight: 800;
   cursor: pointer;
@@ -174,12 +174,12 @@ input {
 }
 
 .home-start-button:hover {
-  background: #336546;
+  background: #44705a;
   transform: translateY(-1px);
 }
 
 .home-start-button:focus-visible {
-  outline: 4px solid rgba(63, 118, 85, 0.28);
+  outline: 4px solid rgba(79, 127, 98, 0.26);
   outline-offset: 3px;
 }
 
@@ -368,7 +368,7 @@ input {
   width: 38px;
   height: 38px;
   border-radius: 12px;
-  background: #417657;
+  background: #4f7f62;
   color: white;
   display: inline-flex;
   align-items: center;
@@ -705,11 +705,12 @@ input {
   }
 }
 
-/* Keep the complete home explanation within one viewport. */
+/* 데스크톱 홈: 한 화면에 들어가면 그대로 채우고, 화면이 낮아 넘치면 잘리지 않고 스크롤된다. */
 @media (min-width: 801px) {
   .home-screen {
-    height: 100dvh;
-    overflow: hidden;
+    min-height: 100dvh;
+    padding-bottom: 24px;
+    overflow-y: auto;
   }
 
   .home-header {
