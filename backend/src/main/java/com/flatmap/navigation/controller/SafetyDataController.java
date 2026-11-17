@@ -1,6 +1,7 @@
 package com.flatmap.navigation.controller;
 
 import com.flatmap.navigation.config.ApiErrors;
+import com.flatmap.navigation.external.GyeonggiBlockedException;
 import com.flatmap.navigation.entity.*;
 import com.flatmap.navigation.ingestion.FacilityIngestionService;
 import com.flatmap.navigation.ingestion.FacilitySource;
@@ -230,6 +231,9 @@ public class SafetyDataController {
         try {
             int saved = gyeonggiDataService.fetchAndSaveAccidentZones();
             return ResponseEntity.ok(Map.of("savedCount", saved, "message", "사고다발지 데이터 수집 완료"));
+        } catch (GyeonggiBlockedException e) {
+            log.error("사고다발지 수집 중단(차단): {}", e.getMessage());
+            return ApiErrors.upstreamBlocked();
         } catch (Exception e) {
             log.error("사고다발지 데이터 수집 실패: {}", e.getMessage(), e);
             return ApiErrors.internal();
@@ -278,6 +282,9 @@ public class SafetyDataController {
         try {
             int saved = gyeonggiDataService.fetchAndSaveSeniorCenters();
             return ResponseEntity.ok(Map.of("savedCount", saved, "message", "노인복지관+경로당 데이터 수집 완료"));
+        } catch (GyeonggiBlockedException e) {
+            log.error("노인복지관+경로당 수집 중단(차단): {}", e.getMessage());
+            return ApiErrors.upstreamBlocked();
         } catch (Exception e) {
             log.error("노인복지관+경로당 수집 실패: {}", e.getMessage(), e);
             return ApiErrors.internal();

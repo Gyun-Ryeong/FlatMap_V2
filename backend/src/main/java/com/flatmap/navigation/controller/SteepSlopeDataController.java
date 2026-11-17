@@ -1,6 +1,7 @@
 package com.flatmap.navigation.controller;
 
 import com.flatmap.navigation.config.ApiErrors;
+import com.flatmap.navigation.external.GyeonggiBlockedException;
 import com.flatmap.navigation.model.SteepSlopeArea;
 import com.flatmap.navigation.repository.SteepSlopeAreaRepository;
 import com.flatmap.navigation.service.CsvImportService;
@@ -64,6 +65,9 @@ public class SteepSlopeDataController {
                     "savedCount", saved,
                     "message", "경기데이터드림 오르막차로 데이터 수집 완료"
             ));
+        } catch (GyeonggiBlockedException e) {
+            log.error("경기데이터드림 수집 중단(차단): {}", e.getMessage());
+            return ApiErrors.upstreamBlocked("source", "GYEONGGI");
         } catch (Exception e) {
             log.error("경기데이터드림 데이터 수집 실패: {}", e.getMessage(), e);
             return ApiErrors.internal("source", "GYEONGGI");

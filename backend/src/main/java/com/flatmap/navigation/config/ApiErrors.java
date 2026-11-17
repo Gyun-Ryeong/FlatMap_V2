@@ -22,6 +22,14 @@ public final class ApiErrors {
         return body(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", INTERNAL_MESSAGE, extra);
     }
 
+    public static final String UPSTREAM_BLOCKED_MESSAGE =
+            "경기데이터드림이 이 서버의 요청을 차단했거나 차단 해제를 기다리는 중입니다. 잠시 후 다시 시도해 주세요.";
+
+    /** 503 — 외부 데이터 제공처(경기데이터드림)가 요청을 차단한 상태. 기존 데이터는 바뀌지 않았다. */
+    public static ResponseEntity<Map<String, Object>> upstreamBlocked(Object... extra) {
+        return body(HttpStatus.SERVICE_UNAVAILABLE, "UPSTREAM_BLOCKED", UPSTREAM_BLOCKED_MESSAGE, extra);
+    }
+
     public static ResponseEntity<Map<String, Object>> body(HttpStatus status, String code, String message,
                                                            Object... extra) {
         Map<String, Object> body = new LinkedHashMap<>();
