@@ -4,20 +4,20 @@ import { WALK_MODES } from '../../utils/walkMode';
 // 이동 기준별 은은한 색(안전=초록, 균형=파랑, 빠른 길=노랑, 오르막 최소=보라).
 // 선택 여부는 색만이 아니라 ✓ 와 굵은 테두리로도 구분한다. 글자색은 배경 대비 4.5:1 이상으로 맞췄다.
 const PRIORITY_TONES = {
-  safety: { border: '#c3dccb', selBorder: '#6fa585', bg: '#f1f7f3', selBg: '#e1efe6', text: '#2f5f45', desc: '#4a6d5a' },
-  balanced: { border: '#cbd8ea', selBorder: '#7e9bc4', bg: '#f0f4fa', selBg: '#e3ecf7', text: '#2c4a73', desc: '#4f6788' },
-  speed: { border: '#eadcb4', selBorder: '#cfa955', bg: '#fbf6e9', selBg: '#f6ecd0', text: '#7a5a14', desc: '#76602c' },
-  flat: { border: '#d8cfe8', selBorder: '#a898cc', bg: '#f5f2fa', selBg: '#ebe5f6', text: '#5a4a85', desc: '#6a5c8c' },
+  safety: { border: '#cadacf', selBorder: '#80a18d', bg: '#f3f6f4', selBg: '#e5eee8', text: '#405c4b', desc: '#556a5e' },
+  balanced: { border: '#cfd8e3', selBorder: '#889ab6', bg: '#f1f4f8', selBg: '#e6ecf3', text: '#384a67', desc: '#58667d' },
+  speed: { border: '#e5dcc3', selBorder: '#c4ab7e', bg: '#f9f6ee', selBg: '#f3ecda', text: '#725c3c', desc: '#706145' },
+  flat: { border: '#d6d0e1', selBorder: '#a59bbe', bg: '#f4f2f8', selBg: '#eae6f1', text: '#584d77', desc: '#685f80' },
 };
 const FALLBACK_TONE = PRIORITY_TONES.balanced;
 
 // 백엔드가 준 후보 경로 중 기준에 맞는 경로를 먼저 선택해 보여준다
 export default function RouteOptions({ priority, onChangePriority, walkMode, onChangeWalkMode }) {
   return (
-    <div style={{ marginTop: 5, padding: '14px', background: '#f7f8fa', border: '1.5px solid #e0e3e8', borderRadius: 12 }}>
+    <div style={{ marginTop: 5, padding: '14px', background: '#f7f8f9', border: '1.5px solid #e1e3e6', borderRadius: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <span style={{ fontSize: 16, fontWeight: 800, color: '#30343d' }}>원하는 길을 선택하세요</span>
-        <span style={{ fontSize: 12, color: '#69707c', fontWeight: 600 }}>하나 선택</span>
+        <span style={{ fontSize: 16, fontWeight: 800, color: '#31343a' }}>원하는 길을 선택하세요</span>
+        <span style={{ fontSize: 12, color: '#6b7078', fontWeight: 600 }}>하나 선택</span>
       </div>
 
       <div className="priority-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7 }}>

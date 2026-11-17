@@ -11,7 +11,7 @@ export default function PlaceShortcuts({
   return (
     <div className="place-shortcuts">
       <div className="place-shortcuts-tabs" role="tablist">
-        <button role="tab" aria-selected={tab === 'favorites'} className={tab === 'favorites' ? 'active' : ''} onClick={() => setTab('favorites')}>
+        <button role="tab" aria-selected={tab === 'favorites'} className={`tab-fav${tab === 'favorites' ? ' active' : ''}`} onClick={() => setTab('favorites')}>
           ★ 즐겨찾기{isLoggedIn ? ` (${favorites.length})` : ''}
         </button>
         <button role="tab" aria-selected={tab === 'history'} className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>

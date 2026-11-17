@@ -14,7 +14,7 @@ export default function Header({ mapReady, mapFailed, onHome, onSOS, accountSlot
               fill="white"
               fillOpacity={0.92}
             />
-            <circle cx={7} cy={5} r={1.5} fill="#6b8fcf" />
+            <circle cx={7} cy={5} r={1.5} fill="#52725d" />
           </svg>
         </div>
         <span className="app-brand-title">{SERVICE_NAME}</span>

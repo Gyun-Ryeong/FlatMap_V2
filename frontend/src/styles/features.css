@@ -7,153 +7,155 @@
 }
 .kakao-user-info { display: flex; align-items: center; gap: 8px; }
 .kakao-user-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
-.kakao-user-nickname { font-size: 14px; font-weight: 700; color: #3d4450; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kakao-user-nickname { font-size: 14px; font-weight: 700; color: #3f444c; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kakao-logout-btn {
-  min-height: 36px; padding: 5px 10px; border: 1.5px solid #cfd4dd; border-radius: 8px; background: white; color: #4f5662;
+  min-height: 36px; padding: 5px 10px; border: 1.5px solid #d1d4da; border-radius: 8px; background: white; color: #51565e;
   font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
 }
 
 /* 입력칸 ★ */
 .favorite-star-btn {
   position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; min-height: 0 !important;
-  border: 0; border-radius: 8px; background: transparent; color: #b6bcc7; font-size: 20px; cursor: pointer;
+  border: 0; border-radius: 8px; background: transparent; color: #b8bcc3; font-size: 20px; cursor: pointer;
 }
-.favorite-star-btn:hover:not(:disabled) { background: #f3f5f8; color: #e0a415; }
-.favorite-star-btn.active { color: #e0a415; cursor: default; }
+.favorite-star-btn:hover:not(:disabled) { background: #f4f5f7; color: #d0a86d; }
+.favorite-star-btn.active { color: #d0a86d; cursor: default; }
 .favorite-star-btn:disabled:not(.active) { opacity: 0.4; cursor: default; }
 
 /* 즐겨찾기·최근 검색 */
-.place-shortcuts { border: 1.5px solid #e0e3e8; border-radius: 12px; background: #fafbfc; padding: 8px 10px 10px; }
+.place-shortcuts { border: 1.5px solid #e1e3e6; border-radius: 12px; background: #fafbfc; padding: 8px 10px 10px; }
 .place-shortcuts-tabs { display: flex; gap: 6px; margin-bottom: 6px; }
 .place-shortcuts-tabs button {
-  flex: 1; min-height: 38px !important; border: 1.5px solid #d9dde4; border-radius: 8px; background: white; color: #5b6370;
+  flex: 1; min-height: 38px !important; border: 1.5px solid #dadde1; border-radius: 8px; background: white; color: #5e636b;
   font-size: 13px; font-weight: 800; cursor: pointer; font-family: inherit;
 }
-.place-shortcuts-tabs button.active { border-color: #4f6f9c; background: #e8eff8; color: #27456f; }
-.place-shortcuts-empty { margin: 8px 2px 2px; font-size: 13px; color: #737a86; line-height: 1.5; }
+.place-shortcuts-tabs button.active { border-color: #5b6e8e; background: #eaeff5; color: #334563; }
+/* 즐겨찾기는 노란색(별·지도 마커와 같은 계열). 글자 대비 5.4 이상. */
+.place-shortcuts-tabs button.tab-fav.active { border-color: #c9ab63; background: #f6ecd0; color: #7a5a14; }
+.place-shortcuts-empty { margin: 8px 2px 2px; font-size: 13px; color: #757a82; line-height: 1.5; }
 .place-shortcuts-list { list-style: none; margin: 0; padding: 0; max-height: 168px; overflow-y: auto; }
-.place-shortcuts-list li { display: flex; align-items: stretch; border-bottom: 1px solid #eceef2; }
+.place-shortcuts-list li { display: flex; align-items: stretch; border-bottom: 1px solid #edeef1; }
 .place-shortcuts-list li:last-child { border-bottom: 0; }
 .place-shortcuts-main {
   flex: 1; min-width: 0; text-align: left; padding: 7px 4px; border: 0; background: none; cursor: pointer; font-family: inherit;
   display: flex; flex-direction: column; gap: 1px;
 }
-.place-shortcuts-main:hover { background: #f1f4f8; }
-.place-shortcuts-name { font-size: 14px; font-weight: 700; color: #30343d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.place-shortcuts-address { font-size: 12px; color: #7a818c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.place-shortcuts-remove { width: 36px; border: 0; background: none; color: #9aa1ad; font-size: 18px; cursor: pointer; }
+.place-shortcuts-main:hover { background: #f2f4f6; }
+.place-shortcuts-name { font-size: 14px; font-weight: 700; color: #31343a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.place-shortcuts-address { font-size: 12px; color: #7c8188; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.place-shortcuts-remove { width: 36px; border: 0; background: none; color: #9ca1a9; font-size: 18px; cursor: pointer; }
 .place-shortcuts-clear {
-  margin-top: 6px; min-height: 34px !important; border: 0; background: none; color: #6b7480; font-size: 12px; font-weight: 700;
+  margin-top: 6px; min-height: 34px !important; border: 0; background: none; color: #6e747c; font-size: 12px; font-weight: 700;
   text-decoration: underline; cursor: pointer; font-family: inherit;
 }
 
 /* 날씨 */
-.weather-card { padding: 10px 12px; border: 1px solid #dfe5ee; border-radius: 10px; background: #f6f8fb; }
+.weather-card { padding: 10px 12px; border: 1px solid #e1e5eb; border-radius: 10px; background: #f7f8fa; }
 .weather-card-missing { display: flex; align-items: center; gap: 10px; }
-.weather-missing-note { font-size: 12px; color: #6b7480; margin-top: 2px; }
+.weather-missing-note { font-size: 12px; color: #6e747c; margin-top: 2px; }
 .weather-main { display: flex; align-items: center; gap: 10px; }
 .weather-icon-large { font-size: 28px; }
 .weather-info { display: flex; flex-direction: column; flex: 1; }
-.weather-temp { font-size: 20px; font-weight: 800; color: #20232b; }
-.weather-desc { font-size: 13px; color: #4f5662; font-weight: 700; }
-.weather-detail { display: flex; flex-direction: column; font-size: 12px; color: #5f6570; text-align: right; }
+.weather-temp { font-size: 20px; font-weight: 800; color: #212328; }
+.weather-desc { font-size: 13px; color: #51565e; font-weight: 700; }
+.weather-detail { display: flex; flex-direction: column; font-size: 12px; color: #61656c; text-align: right; }
 .weather-warning {
-  margin-top: 8px; padding: 7px 10px; border-radius: 8px; background: #fbf5e6; border: 1px solid #e6d8b2;
-  color: #7d6220; font-size: 12.5px; font-weight: 700; display: flex; gap: 6px; align-items: flex-start;
+  margin-top: 8px; padding: 7px 10px; border-radius: 8px; background: #f9f5eb; border: 1px solid #e1d8c1;
+  color: #756343; font-size: 12.5px; font-weight: 700; display: flex; gap: 6px; align-items: flex-start;
 }
 .weather-mini {
   position: absolute; top: 10px; right: 56px; z-index: 90; display: flex; align-items: center; gap: 5px; padding: 6px 11px;
-  border-radius: 99px; background: rgba(255, 255, 255, 0.95); border: 1px solid #d5dbe4; box-shadow: 0 2px 8px rgba(70, 90, 120, 0.15);
-  font-size: 14px; font-weight: 800; color: #30343d;
+  border-radius: 99px; background: rgba(255, 255, 255, 0.95); border: 1px solid #d7dbe1; box-shadow: 0 2px 8px rgba(77, 90, 110, 0.15);
+  font-size: 14px; font-weight: 800; color: #31343a;
 }
-.weather-mini.warning { border-color: #e0c27a; }
+.weather-mini.warning { border-color: #d7c39a; }
 
 /* 경로 상세: 경고·우회 */
 .route-detail { display: flex; flex-direction: column; gap: 8px; }
-.route-detail-note { margin: 0; font-size: 12px; color: #6b7480; line-height: 1.55; }
-.slope-warning { padding: 10px 12px; border-radius: 10px; background: #fdf5ed; border: 1px solid #efd3b6; }
-.slope-warning-title { font-size: 13.5px; font-weight: 800; color: #9a4f12; margin-bottom: 6px; }
+.route-detail-note { margin: 0; font-size: 12px; color: #6e747c; line-height: 1.55; }
+.slope-warning { padding: 10px 12px; border-radius: 10px; background: #fbf5f0; border: 1px solid #e7d5c3; }
+.slope-warning-title { font-size: 13.5px; font-weight: 800; color: #8a573e; margin-bottom: 6px; }
 .slope-warning-list { list-style: none; margin: 0 0 6px; padding: 0; }
-.slope-warning-list li { display: flex; flex-direction: column; padding: 4px 0; border-bottom: 1px dashed #efd9c2; }
+.slope-warning-list li { display: flex; flex-direction: column; padding: 4px 0; border-bottom: 1px dashed #e9dacc; }
 .slope-warning-list li:last-child { border-bottom: 0; }
-.slope-warning-name { font-size: 13px; font-weight: 700; color: #3d3226; }
-.slope-warning-detail { font-size: 12px; color: #7a6a58; }
+.slope-warning-name { font-size: 13px; font-weight: 700; color: #3a332b; }
+.slope-warning-detail { font-size: 12px; color: #766b60; }
 .detour-btn {
-  min-height: 46px; padding: 10px 12px; border-radius: 10px; border: 1.5px solid #8fb7e6; background: #eef5fd; color: #1f4f86;
+  min-height: 46px; padding: 10px 12px; border-radius: 10px; border: 1.5px solid #9db6d6; background: #f0f5fa; color: #354f76;
   font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit;
 }
 .detour-btn:disabled { opacity: 0.6; cursor: wait; }
-.detour-result { padding: 10px 12px; border-radius: 10px; background: #eef5fd; border: 1px solid #b7d1ee; }
-.detour-result-title { font-size: 13.5px; font-weight: 800; color: #1f4f86; margin-bottom: 4px; }
-.detour-result-stats { display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 700; color: #34495f; }
+.detour-result { padding: 10px 12px; border-radius: 10px; background: #f0f5fa; border: 1px solid #c0d0e4; }
+.detour-result-title { font-size: 13.5px; font-weight: 800; color: #354f76; margin-bottom: 4px; }
+.detour-result-stats { display: flex; flex-direction: column; gap: 2px; font-size: 13px; font-weight: 700; color: #3b4858; }
 
 /* 급경사지 레이어 */
 .steep-dot {
-  width: 18px; height: 18px; border-radius: 50%; background: #e0701f; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); cursor: pointer;
+  width: 18px; height: 18px; border-radius: 50%; background: #c97c5b; border: 3px solid #ffffff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); cursor: pointer;
 }
-.layer-footnote { margin: 0; font-size: 12px; color: #6b7480; line-height: 1.5; }
+.layer-footnote { margin: 0; font-size: 12px; color: #6e747c; line-height: 1.5; }
 .layer-info-window {
   min-width: 190px; max-width: 260px; background: white; border-radius: 10px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); overflow: hidden; font-size: 13px;
 }
 .layer-info-header {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; background: #fdf1e6;
-  color: #7a3d0c; font-weight: 800;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; background: #faf2eb;
+  color: #6d432f; font-weight: 800;
 }
-.layer-info-close { border: 0; background: none; font-size: 18px; line-height: 1; color: #7a3d0c; cursor: pointer; }
-.layer-info-body { padding: 8px 10px; color: #3d4450; }
+.layer-info-close { border: 0; background: none; font-size: 18px; line-height: 1; color: #6d432f; cursor: pointer; }
+.layer-info-body { padding: 8px 10px; color: #3f444c; }
 .layer-info-body p { margin: 0 0 3px; }
 
 /* 즐겨찾기 지도 마커 */
 .fav-map-marker { display: flex; flex-direction: column; align-items: center; }
-.fav-map-pin { color: #e0a415; font-size: 22px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); line-height: 1; }
+.fav-map-pin { color: #d0a86d; font-size: 22px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); line-height: 1; }
 .fav-map-label {
-  margin-top: 1px; padding: 1px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.92); border: 1px solid #e6d8b2;
-  font-size: 11px; font-weight: 700; color: #5c4a14; white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis;
+  margin-top: 1px; padding: 1px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.92); border: 1px solid #e1d8c1;
+  font-size: 11px; font-weight: 700; color: #574b30; white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* FlatMap 안전정보 레이어(사고다발지·보호구역·복지시설·그늘막·노인복지관) 마커 — 원본 FlatMap 과 같은 원형 마커 */
 .layer-marker-wrap { cursor: pointer; }
 .layer-marker-circle {
   width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  font-size: 12px; border: 1.5px solid #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); transition: transform 0.15s;
+  font-size: 12px; border: 1.5px solid #ffffff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); transition: transform 0.15s;
 }
 .layer-marker-wrap:hover .layer-marker-circle { transform: scale(1.25); }
-.layer-info-header.zone { background: #eef2f8; color: #27456f; }
-.layer-info-header.zone .layer-info-close { color: #27456f; }
+.layer-info-header.zone { background: #eff2f6; color: #334563; }
+.layer-info-header.zone .layer-info-close { color: #334563; }
 
 /* 오르막길 구간 목록(FlatMap 오르막길 탭 복원) */
-.steep-list-body { margin-top: 6px; padding: 10px 12px; background: #f6f7f9; border: 1px solid #e4e6eb; border-radius: 8px; }
-.steep-list-desc { margin: 0 0 8px; font-size: 13px; color: #606874; line-height: 1.6; }
-.steep-list-terrain { color: #2f6b4f; font-weight: 700; }
-.steep-list-warn { color: #b45309; font-weight: 700; }
-.steep-list-note { margin: 6px 0; font-size: 13px; color: #6b7480; line-height: 1.5; }
+.steep-list-body { margin-top: 6px; padding: 10px 12px; background: #f6f7f8; border: 1px solid #e5e6e9; border-radius: 8px; }
+.steep-list-desc { margin: 0 0 8px; font-size: 13px; color: #636870; line-height: 1.6; }
+.steep-list-terrain { color: #456755; font-weight: 700; }
+.steep-list-warn { color: #a05e44; font-weight: 700; }
+.steep-list-note { margin: 6px 0; font-size: 13px; color: #6e747c; line-height: 1.5; }
 .steep-filter-row { display: flex; gap: 6px; margin-bottom: 8px; }
 .steep-filter-select {
-  flex: 1; min-height: 40px; padding: 6px 10px; border: 1.5px solid #cfd4dd; border-radius: 8px; background: white;
-  color: #4f5662; font-size: 13.5px; font-family: inherit; cursor: pointer;
+  flex: 1; min-height: 40px; padding: 6px 10px; border: 1.5px solid #d1d4da; border-radius: 8px; background: white;
+  color: #51565e; font-size: 13.5px; font-family: inherit; cursor: pointer;
 }
 .steep-segment-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
 .steep-segment-item {
   display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 52px; padding: 10px 12px;
-  background: white; border: 1.5px solid #e0e3e8; border-radius: 9px; cursor: pointer; text-align: left; font-family: inherit;
+  background: white; border: 1.5px solid #e1e3e6; border-radius: 9px; cursor: pointer; text-align: left; font-family: inherit;
 }
-.steep-segment-item:hover:not(:disabled) { border-color: #7e9bc4; background: #f3f7fc; }
+.steep-segment-item:hover:not(:disabled) { border-color: #889ab6; background: #f4f7fa; }
 .steep-segment-item:disabled { opacity: 0.55; cursor: default; }
 .steep-segment-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.steep-segment-name { font-size: 14px; font-weight: 800; color: #30343d; }
-.steep-segment-city { font-size: 12px; color: #6b7480; }
+.steep-segment-name { font-size: 14px; font-weight: 800; color: #31343a; }
+.steep-segment-city { font-size: 12px; color: #6e747c; }
 .steep-terrain-tag {
-  display: inline-block; margin-right: 5px; padding: 1px 5px; border-radius: 3px; background: #e6f2ea; color: #2f6b4f;
-  border: 1px solid #b9dcc7; font-size: 10px; font-weight: 700; vertical-align: middle;
+  display: inline-block; margin-right: 5px; padding: 1px 5px; border-radius: 3px; background: #e9f1ec; color: #456755;
+  border: 1px solid #c3d9cc; font-size: 10px; font-weight: 700; vertical-align: middle;
 }
-.steep-grade-badge { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #7a3d0c; background: #fdf1e6; padding: 3px 8px; border-radius: 6px; }
-.steep-grade-badge.unknown { color: #6b7280; background: #f2f3f5; border: 1px dashed #c4c8ce; padding: 2px 7px; }
+.steep-grade-badge { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #6d432f; background: #faf2eb; padding: 3px 8px; border-radius: 6px; }
+.steep-grade-badge.unknown { color: #6d727b; background: #f2f3f4; border: 1px dashed #c5c8cc; padding: 2px 7px; }
 
 /* RAG 질문 진입점(서버가 켜짐+연결됨이라고 알려 줄 때만 렌더된다) */
-.rag-body { margin-top: 6px; padding: 10px 12px; background: #f6f7f9; border: 1px solid #e4e6eb; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; }
-.rag-input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1.5px solid #cfd4dd; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; }
-.rag-submit { min-height: 44px; border: 0; border-radius: 9px; background: #4f6f9c; color: white; font-size: 15px; font-weight: 800; cursor: pointer; font-family: inherit; }
+.rag-body { margin-top: 6px; padding: 10px 12px; background: #f6f7f8; border: 1px solid #e5e6e9; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; }
+.rag-input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1.5px solid #d1d4da; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; }
+.rag-submit { min-height: 44px; border: 0; border-radius: 9px; background: #5b6e8e; color: white; font-size: 15px; font-weight: 800; cursor: pointer; font-family: inherit; }
 .rag-submit:disabled { opacity: 0.6; cursor: default; }
-.rag-answer { padding: 10px 12px; background: white; border: 1px solid #e0e3e8; border-radius: 9px; font-size: 14px; line-height: 1.6; color: #30343d; }
+.rag-answer { padding: 10px 12px; background: white; border: 1px solid #e1e3e6; border-radius: 9px; font-size: 14px; line-height: 1.6; color: #31343a; }
 .rag-answer p { margin: 0 0 6px; white-space: pre-wrap; }
-.rag-sources { margin: 0; padding-left: 18px; font-size: 12.5px; color: #6b7480; }
+.rag-sources { margin: 0; padding-left: 18px; font-size: 12.5px; color: #6e747c; }
