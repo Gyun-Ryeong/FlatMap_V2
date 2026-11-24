@@ -1,5 +1,7 @@
 package com.flatmap.navigation.routescore;
 
+import com.flatmap.navigation.dto.WeatherInfo;
+
 import java.util.List;
 
 /**
@@ -7,7 +9,8 @@ import java.util.List;
  *
  * @param coordinates  {@code [위도, 경도]} 목록
  * @param totalScore   총점 0~100. 설계 파라미터 기반 상대 비교 값이며 위험도가 아니다.
- * @param breakdown    축별 점수와 계산 입력값
+ * @param breakdown    축별 점수와 계산 입력값(날씨를 얻지 못하면 C축은 빠진다)
+ * @param weather      경로 중간 지점 기준 날씨. {@code fallback=true} 면 실제 값이 아니고 점수에 반영되지 않았다.
  * @param recommended  후보 중 총점이 가장 높은 경로(동점이면 소요 시간이 짧은 쪽)
  */
 public record ScoredRoute(
@@ -22,10 +25,11 @@ public record ScoredRoute(
         int cctvCount,
         int lightCount,
         int policeCount,
+        WeatherInfo weather,
         boolean recommended) {
 
     ScoredRoute asRecommended() {
         return new ScoredRoute(routeId, coordinates, totalDistance, totalTime, searchOptionCode, searchOption,
-                totalScore, breakdown, cctvCount, lightCount, policeCount, true);
+                totalScore, breakdown, cctvCount, lightCount, policeCount, weather, true);
     }
 }

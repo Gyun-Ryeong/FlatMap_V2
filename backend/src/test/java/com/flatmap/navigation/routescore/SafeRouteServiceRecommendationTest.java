@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SafeRouteServiceRecommendationTest {
 
     private static ScoredRoute route(String id, double score, int time) {
-        return new ScoredRoute(id, List.of(), 100, time, 0, "일반", score, List.of(), 0, 0, 0, false);
+        return new ScoredRoute(id, List.of(), 100, time, 0, "일반", score, List.of(), 0, 0, 0, null, false);
     }
 
     @Test

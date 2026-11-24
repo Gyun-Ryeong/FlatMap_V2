@@ -25,8 +25,20 @@ public class ScoreModelConfig {
                           @Value("${score.route.police-radius-meters}") double policeRadiusMeters,
                           @Value("${score.route.min-length-km}") double minRouteKm,
                           @Value("${score.route.exposure-breakpoints}") String exposureBreakpoints,
-                          @Value("${score.route.axis-weight.a}") double axisWeightA) {
+                          @Value("${score.route.axis-weight.a}") double axisWeightA,
+                          @Value("${score.route.axis-weight.c}") double axisWeightC) {
         return new ScoreModel(version, weights, radiusMeters, policeRadiusMeters, minRouteKm,
-                PiecewiseScale.parse(exposureBreakpoints), axisWeightA);
+                PiecewiseScale.parse(exposureBreakpoints), axisWeightA, axisWeightC);
+    }
+
+    @Bean
+    WeatherCorrection weatherCorrection(@Value("${weather.correction.snow}") double snow,
+                                        @Value("${weather.correction.sleet}") double sleet,
+                                        @Value("${weather.correction.rain}") double rain,
+                                        @Value("${weather.correction.freezing}") double freezing,
+                                        @Value("${weather.correction.strong-wind}") double strongWind,
+                                        @Value("${weather.correction.freezing-temp-celsius}") double freezingTemp,
+                                        @Value("${weather.correction.strong-wind-mps}") double strongWindMps) {
+        return new WeatherCorrection(snow, sleet, rain, freezing, strongWind, freezingTemp, strongWindMps);
     }
 }

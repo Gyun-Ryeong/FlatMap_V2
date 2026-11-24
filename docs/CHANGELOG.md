@@ -2,6 +2,38 @@
 
 > 단계 번호: 아래 "1단계 — 통합 스키마…" 는 로드맵의 00(foundation) 이다. 로드맵 01(ingestion)은 이 문서 맨 위 항목이다.
 
+## 04 단계 — 날씨 보정(C축)과 우회 경로 통합 (weather-detour) (2026-11-10) — 구현·자동 테스트 완료
+
+기상 정보를 점수의 **C축(날씨 보정)** 으로 연결하고, 우회 경로가 새 점수와 PostGIS 급경사지 조회를 쓰도록 맞췄다.
+**점수는 검증되지 않은 설계 파라미터이며 위험도·안전도가 아니다.** 지금은 A(야간 시설 노출)·C(날씨 보정)를 반영하고, 보행난이도(B)는 아직 반영하지 않는다.
+
+### 추가됨
+
+- **C축(날씨 보정)**: 날씨마다 보정 계수를 정하고 C 점수 = 100 ÷ 계수(맑음 100점). 눈 1.8 / 비·눈 1.6 / 비 1.4 / 영하 1.6 / 강풍 1.2 이며, 조건이 겹치면 눈 > 비/눈 > 비 > 영하 > 강풍 순으로 **하나만** 적용한다. 계수와 경계(기온 ≤ 0℃, 풍속 ≥ 10m/s, 경계 포함)·축 가중치(`score.route.axis-weight.c`)는 모두 `application.properties` 설정값이다. `breakdown` 에 별도 항목(`axis: "C"`)으로 나타난다. 총점은 반영된 축의 가중 평균.
+- **기상 정보를 얻지 못하면 C축은 빠진다**(0점·100점으로 채우지 않음). 그때 `weather.fallback=true` 이고 `breakdown` 은 A만 담는다. 응답의 `scoreModel.note` 에 이 규칙을 적었다.
+- **우회 경로 응답에 점수**: `POST /api/route/walk/detour` 와 `/api/route/walk` 응답에 `totalScore`, `breakdown[]` 가 들어간다. 우회 요청에는 비교 기준인 `originalTotalScore` 도 들어간다. 후보 경로(`GET /api/routes/safe`)에는 경로별 `weather` 가 들어간다.
+- `DetourRouteService`: 컨트롤러에 있던 우회 판단을 서비스로 옮겼다. 후보 경로·단일 경로·우회가 같은 점수 함수(`SafeRouteService.evaluate`: 시설 집계 쿼리 1회 + 경로 중간 지점 날씨)를 쓴다.
+- 설정값: `weather.correction.*`, `weather.connect-timeout-ms / read-timeout-ms / cache-ttl-minutes / failure-backoff-seconds / cache-max-entries`, `detour.max-score-drop`.
+
+### 변경됨
+
+- **우회 채택 규칙**: 급경사지(붕괴위험 경고) 구간이 **줄어야** 하고, 추가로 총점이 원경로보다 `detour.max-score-drop`(기본 10점)을 넘게 떨어지지 않아야 한다. 아니면 **원경로**를 돌려준다(`detourApplied=false`, `detourMessage`). 급경사지는 여전히 점수에 섞지 않는다.
+- **외부 호출 실패**: 우회용 T Map 호출이 실패하면 원경로를 돌려준다(전엔 400). 원경로 조회가 실패하면 일반화된 502(`ROUTE_PROVIDER_UNAVAILABLE`, 전엔 본문 없는 400). 기상청 호출 실패는 fallback 으로 진행한다. 응답에는 외부 메시지가 실리지 않는다.
+- **기상청 호출**: 전용 `RestTemplate` 에 연결 2s/읽기 3s 타임아웃(전엔 무제한). 로그에서 요청 URL(서비스키 포함)·응답 본문을 없앴다 — 이전엔 실패 시 예외 메시지에 서비스키가 든 URL 이 로그에 남을 수 있었다. 실패한 격자는 60초간 다시 부르지 않는다(후보 3개가 연달아 타임아웃을 기다리지 않도록). 캐시 크기에 상한(500격자)을 뒀다. 기준 시각을 서버 시간대와 무관하게 **KST** 로 계산한다.
+- 날씨 대체값 `description` 이 "맑음 (기본값)" → "날씨 정보 없음", `icon` 은 `unknown`, `fallback: true` 로 표시한다(실제 관측처럼 보이지 않게).
+- 경로 제공자 실패는 `RouteProviderException`(일반화된 메시지)로 구분한다. 이전엔 컨트롤러가 모든 `RuntimeException` 을 400 으로 바꿔 DB 오류까지 가렸다. 이제 그런 오류는 일반화된 500 이다.
+
+### 제거됨 (호환성 영향)
+
+- `WeatherInfo.riskMultiplier`(JSON 필드): 하드코딩된 계수였다. 계수는 이제 설정값이며 C축 `breakdown[].detail.multiplier` 로 나간다. 현재 프론트는 이 필드를 읽지 않는다.
+
+### 한계 / 후속
+
+- 날씨는 한 경로 안에서 한 지점(경로 중간)만 조회한다. 후보 경로끼리 같은 기상 격자에 있으면 C 점수가 같아 **추천 순위는 바뀌지 않고 총점의 절대값만 바뀐다**. 날씨가 경로 선택에 영향을 주려면 보행난이도(B축, 06)와 결합해야 한다(비·결빙이 경사에 미치는 영향).
+- 보정 계수와 `detour.max-score-drop` 은 근거가 검증되지 않은 값이다. `WeatherService.applyWarning` 의 경고 문구 경계(0℃·10m/s)는 아직 설정값과 별개로 코드에 있다.
+- 기상청·T Map 실제 호출은 이번 단계에서 모킹으로만 검증했다(키·쿼터 사용 없음).
+- 프론트(CRA)는 `/api/route/walk` 의 실패 응답이 400 → 502 로 바뀐 것과 새 필드(`breakdown` 등)를 아직 쓰지 않는다. 05 단계에서 포팅한다.
+
 ## 03 단계 — 경로 점수 + 시설 밀도 격자 (route-score) (2026-11-10) — 구현·자동 테스트 완료
 
 후보 경로 3종에 A축(야간 시설 노출) 점수를 매기고, 시설 밀도 격자를 재계산·조회할 수 있게 했다.
