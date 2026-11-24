@@ -9,6 +9,7 @@ import com.flatmap.navigation.service.DisasterDataService;
 import com.flatmap.navigation.service.ElevationService;
 import com.flatmap.navigation.service.GyeonggiDataService;
 import com.flatmap.navigation.service.PublicDataService;
+import com.flatmap.navigation.service.SteepSlopeGradeImportService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -36,6 +37,7 @@ public class SteepSlopeDataController {
     private final PublicDataService publicDataService;
     private final CsvImportService csvImportService;
     private final ElevationService elevationService;
+    private final SteepSlopeGradeImportService gradeImportService;
     private final SteepSlopeAreaRepository repository;
 
     public SteepSlopeDataController(GyeonggiDataService gyeonggiDataService,
@@ -43,12 +45,14 @@ public class SteepSlopeDataController {
                                      PublicDataService publicDataService,
                                      CsvImportService csvImportService,
                                      ElevationService elevationService,
+                                     SteepSlopeGradeImportService gradeImportService,
                                      SteepSlopeAreaRepository repository) {
         this.gyeonggiDataService = gyeonggiDataService;
         this.disasterDataService = disasterDataService;
         this.publicDataService = publicDataService;
         this.csvImportService = csvImportService;
         this.elevationService = elevationService;
+        this.gradeImportService = gradeImportService;
         this.repository = repository;
     }
 
@@ -225,6 +229,27 @@ public class SteepSlopeDataController {
 
         log.info("경사도 갱신 완료 — {}", result);
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 성남시 급경사지와 경사도(°)를 번들 CSV(원본 FlatMap 값)로 적재한다. MOIS_CSV 출처를 통째로 교체하며
+     * 몇 번 실행해도 결과가 같다. CSV 가 잘못되면 DB 는 바뀌지 않는다.
+     */
+    @PostMapping("/import/seongnam-grades")
+    public ResponseEntity<Map<String, Object>> importSeongnamGrades() {
+        log.info("성남시 급경사지 경사도 적재 요청");
+        try {
+            SteepSlopeGradeImportService.Result r = gradeImportService.importBundled();
+            Map<String, Object> response = new java.util.HashMap<>();
+            response.put("parsed", r.parsed());
+            response.put("saved", r.saved());
+            response.put("withGrade", r.withGrade());
+            response.put("totalInDb", repository.count());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("급경사지 경사도 적재 실패: {}", e.getMessage(), e);
+            return ApiErrors.internal();
+        }
     }
 
     /** 행정안전부 CSV 성남시 급경사지 임포트 */
