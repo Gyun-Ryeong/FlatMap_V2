@@ -5,39 +5,53 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flatmap.navigation.config.ApiKeyConfig;
 import com.flatmap.navigation.entity.AccidentZone;
 import com.flatmap.navigation.entity.SeniorCenter;
+import com.flatmap.navigation.external.GyeonggiApiException;
+import com.flatmap.navigation.external.GyeonggiHostGuard;
+import com.flatmap.navigation.ingestion.IngestionHttp;
 import com.flatmap.navigation.model.SteepSlopeArea;
 import com.flatmap.navigation.repository.AccidentZoneRepository;
 import com.flatmap.navigation.repository.SeniorCenterRepository;
 import com.flatmap.navigation.repository.SteepSlopeAreaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 @Service
 public class GyeonggiDataService {
 
     private static final Logger log = LoggerFactory.getLogger(GyeonggiDataService.class);
     private static final String GG_BASE = "https://openapi.gg.go.kr";
-    private static final int TIMEOUT_MS = 5000; // 5s — openapi.gg.go.kr is occasionally slow
+    /** 한 서비스에서 받을 최대 페이지 수 — 응답이 끝나지 않는 경우의 안전장치. */
+    private static final int MAX_PAGES = 200;
 
-    private final RestTemplate restTemplate;
+    private final IngestionHttp http;
+    private final GyeonggiHostGuard guard;
+    private final long pageDelayMs;
+    private long lastCallAtMs = 0;
     private final ApiKeyConfig apiKeyConfig;
     private final ObjectMapper objectMapper;
     private final SteepSlopeAreaRepository steepSlopeAreaRepository;
     private final AccidentZoneRepository accidentZoneRepository;
     private final SeniorCenterRepository seniorCenterRepository;
 
-    public GyeonggiDataService(RestTemplate restTemplate, ApiKeyConfig apiKeyConfig,
+    @Autowired
+    public GyeonggiDataService(IngestionHttp http, GyeonggiHostGuard guard,
+                                @Value("${gyeonggi.page-delay-ms:500}") long pageDelayMs,
+                                ApiKeyConfig apiKeyConfig,
                                 ObjectMapper objectMapper,
                                 SteepSlopeAreaRepository steepSlopeAreaRepository,
                                 AccidentZoneRepository accidentZoneRepository,
                                 SeniorCenterRepository seniorCenterRepository) {
-        this.restTemplate = restTemplate;
+        this.http = http;
+        this.guard = guard;
+        this.pageDelayMs = pageDelayMs;
         this.apiKeyConfig = apiKeyConfig;
         this.objectMapper = objectMapper;
         this.steepSlopeAreaRepository = steepSlopeAreaRepository;
@@ -46,30 +60,96 @@ public class GyeonggiDataService {
     }
 
     // ============================================================
-    // Common Gyeonggi API caller with 5-second timeout
+    // 공통 호출 — 호출 간 지연, 순차 실행, 차단 감지
     // ============================================================
 
-    private String callGyeonggiApi(String serviceName, String apiKey, int page, int size) {
+    /**
+     * 경기데이터드림 1회 호출. 같은 호스트로 나가는 모든 호출이 여기를 지나므로
+     * (synchronized) 관리자 수집이 겹쳐 실행돼도 동시에 두드리지 않고, 호출 사이에 pageDelayMs 이상 간격을 둔다.
+     * 차단 대기 중이면 네트워크를 건드리지 않고, 차단 페이지를 받으면 대기에 들어간 뒤 예외를 던진다.
+     * 실패는 null 이 아니라 예외다 — 호출자가 부분 결과를 성공처럼 저장하지 못하게 한다.
+     */
+    private synchronized String callGyeonggiApi(String serviceName, String apiKey, int page, int size) {
+        guard.requireOpen();
+        pace();
+
         String url = String.format("%s/%s?KEY=%s&Type=json&pIndex=%d&pSize=%d",
                 GG_BASE, serviceName, apiKey, page, size);
         log.info("[경기] API 호출: {}", url.replace(apiKey, "***"));
-
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(TIMEOUT_MS);
-        factory.setReadTimeout(TIMEOUT_MS);
-        RestTemplate ggRestTemplate = new RestTemplate(factory);
-
         try {
-            String raw = ggRestTemplate.getForObject(url, String.class);
-            if (raw != null) {
-                log.info("[경기][{}] 응답 앞 300자: {}", serviceName,
-                        raw.substring(0, Math.min(raw.length(), 300)));
+            String raw = guard.inspect(http.get(url));
+            if (raw == null || raw.isBlank()) {
+                throw new GyeonggiApiException("[" + serviceName + "] 빈 응답");
             }
             return raw;
-        } catch (Exception e) {
-            log.error("[경기][{}] API 호출 실패 (timeout={}ms): {}", serviceName, TIMEOUT_MS, e.getMessage());
-            return null;
+        } catch (GyeonggiApiException e) {
+            throw e;
+        } catch (IOException e) {
+            // IngestionHttp 의 메시지는 URL 을 담지 않는다("HTTP 500", 타임아웃 등).
+            log.error("[경기][{}] API 호출 실패: {}", serviceName, e.getMessage());
+            throw new GyeonggiApiException("[" + serviceName + "] API 호출 실패", e);
         }
+    }
+
+    private void pace() {
+        if (pageDelayMs > 0) {
+            long wait = lastCallAtMs + pageDelayMs - System.currentTimeMillis();
+            if (wait > 0) {
+                try {
+                    Thread.sleep(wait);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new GyeonggiApiException("수집이 중단되었습니다");
+                }
+            }
+        }
+        lastCallAtMs = System.currentTimeMillis();
+    }
+
+    /**
+     * 한 서비스의 모든 페이지를 순서대로 읽어 row 마다 consumer 를 호출한다.
+     * 끝은 "데이터 없음(INFO-200)·row 없음·누적 건수가 list_total_count 에 도달"로만 판단한다.
+     * 그 밖의 결과 코드(키 오류·호출 한도 초과 등)·해석 실패·호출 실패는 예외로 전체를 중단한다.
+     */
+    private void forEachRow(String serviceName, String apiKey, int pageSize, Consumer<JsonNode> consumer) {
+        for (int page = 1; page <= MAX_PAGES; page++) {
+            String raw = callGyeonggiApi(serviceName, apiKey, page, pageSize);
+            JsonNode root;
+            try {
+                root = objectMapper.readTree(raw);
+            } catch (Exception e) {
+                throw new GyeonggiApiException("[" + serviceName + "] 응답을 해석하지 못했습니다", e);
+            }
+
+            JsonNode top = root.path("RESULT");
+            if (!top.isMissingNode()) {
+                String code = top.path("CODE").asText("");
+                if ("INFO-200".equals(code)) return; // 해당 페이지에 데이터 없음 = 끝
+                throw new GyeonggiApiException("[" + serviceName + "] API 결과 코드 " + code);
+            }
+
+            JsonNode rows = findRows(root);
+            if (rows == null || rows.isEmpty()) return;
+            if (page == 1) log.info("[{}] 첫 row: {}", serviceName, rows.get(0));
+            for (JsonNode row : rows) consumer.accept(row);
+
+            int total = totalCount(root);
+            log.info("[{}] page={} {}건 조회 (전체 {}건)", serviceName, page, rows.size(), total);
+            if (rows.size() < pageSize || (total > 0 && (long) page * pageSize >= total)) return;
+        }
+        throw new GyeonggiApiException("[" + serviceName + "] 페이지가 " + MAX_PAGES + "를 넘어 중단했습니다");
+    }
+
+    private int totalCount(JsonNode root) {
+        var names = root.fieldNames();
+        while (names.hasNext()) {
+            JsonNode svc = root.path(names.next());
+            if (svc.isArray() && !svc.isEmpty()) {
+                int n = svc.get(0).path("head").path(0).path("list_total_count").asInt(0);
+                if (n > 0) return n;
+            }
+        }
+        return 0;
     }
 
     /** Extract the row array from Gyeonggi-style JSON: { "ServiceName": [{head}, {row:[...]}] } */
@@ -93,31 +173,11 @@ public class GyeonggiDataService {
     public int fetchAndSaveUphillLanes() {
         log.info("=== 경기데이터드림 오르막차로 데이터 수집 시작 ===");
         List<SteepSlopeArea> allAreas = new ArrayList<>();
-        int page = 1;
-
-        while (true) {
-            String raw = callGyeonggiApi("UphillLane", apiKeyConfig.getGyeonggiUphillLaneApiKey(), page, 100);
-            if (raw == null || raw.trim().startsWith("<")) break;
-
-            try {
-                JsonNode root = objectMapper.readTree(raw);
-                JsonNode rows = findRows(root);
-                if (rows == null || rows.isEmpty()) break;
-
-                if (page == 1) log.info("[오르막차로] 첫 row: {}", rows.get(0));
-
-                for (JsonNode row : rows) {
-                    SteepSlopeArea area = parseUphillLaneRow(row);
-                    if (area != null) allAreas.add(area);
-                }
-
-                if (rows.size() < 100) break;
-                page++;
-            } catch (Exception e) {
-                log.error("[오르막차로] 파싱 실패: {}", e.getMessage());
-                break;
-            }
-        }
+        // 중간에 실패하면 예외가 올라가 저장하지 않는다 — 부분 결과로 기존 데이터를 덮어쓰지 않는다.
+        forEachRow("UphillLane", apiKeyConfig.getGyeonggiUphillLaneApiKey(), 100, row -> {
+            SteepSlopeArea area = parseUphillLaneRow(row);
+            if (area != null) allAreas.add(area);
+        });
 
         if (!allAreas.isEmpty()) {
             steepSlopeAreaRepository.replaceSource("GYEONGGI", allAreas);
@@ -161,26 +221,11 @@ public class GyeonggiDataService {
 
     private List<AccidentZone> fetchAccidentService(String serviceName, String type) {
         List<AccidentZone> result = new ArrayList<>();
-        int page = 1;
-        while (true) {
-            try {
-                String raw = callGyeonggiApi(serviceName, apiKeyConfig.getGyeonggiApiKey(), page, 1000);
-                if (raw == null || raw.trim().startsWith("<")) break;
-                JsonNode rows = findRows(objectMapper.readTree(raw));
-                if (rows == null || rows.isEmpty()) break;
-                if (page == 1) log.info("[{}] 첫 row: {}", serviceName, rows.get(0));
-                for (JsonNode row : rows) {
-                    AccidentZone z = parseAccidentRow(row, type, serviceName);
-                    if (z != null) result.add(z);
-                }
-                log.info("[{}] page={} {}건 조회, 성남시 {}건 누적", serviceName, page, rows.size(), result.size());
-                if (rows.size() < 1000) break;
-                page++;
-            } catch (Exception e) {
-                log.error("[{}] 수집 실패: {}", serviceName, e.getMessage());
-                break;
-            }
-        }
+        forEachRow(serviceName, apiKeyConfig.getGyeonggiApiKey(), 1000, row -> {
+            AccidentZone z = parseAccidentRow(row, type, serviceName);
+            if (z != null) result.add(z);
+        });
+        log.info("[{}] 성남시 {}건", serviceName, result.size());
         return result;
     }
 
@@ -221,26 +266,11 @@ public class GyeonggiDataService {
 
     private List<SeniorCenter> fetchSeniorService(String serviceName, String defaultName) {
         List<SeniorCenter> result = new ArrayList<>();
-        int page = 1;
-        while (true) {
-            try {
-                String raw = callGyeonggiApi(serviceName, apiKeyConfig.getGyeonggiApiKey(), page, 1000);
-                if (raw == null || raw.trim().startsWith("<")) break;
-                JsonNode rows = findRows(objectMapper.readTree(raw));
-                if (rows == null || rows.isEmpty()) break;
-                if (page == 1) log.info("[{}] 첫 row: {}", serviceName, rows.get(0));
-                for (JsonNode row : rows) {
-                    SeniorCenter c = parseSeniorCenterRow(row, defaultName);
-                    if (c != null) result.add(c);
-                }
-                log.info("[{}] page={} {}건 조회, 성남시 {}건 누적", serviceName, page, rows.size(), result.size());
-                if (rows.size() < 1000) break;
-                page++;
-            } catch (Exception e) {
-                log.error("[{}] 수집 실패: {}", serviceName, e.getMessage());
-                break;
-            }
-        }
+        forEachRow(serviceName, apiKeyConfig.getGyeonggiApiKey(), 1000, row -> {
+            SeniorCenter c = parseSeniorCenterRow(row, defaultName);
+            if (c != null) result.add(c);
+        });
+        log.info("[{}] 성남시 {}건", serviceName, result.size());
         return result;
     }
 
