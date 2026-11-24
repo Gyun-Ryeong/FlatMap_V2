@@ -97,6 +97,25 @@ public class SafetyFacilityRepository {
                 routeWkt, radiusMeters, policeRadiusMeters);
     }
 
+    /**
+     * 지도 영역(사각형) 안의 시설. location 의 geometry GiST 인덱스를 타는 `&&` 로 걸러 지도 뷰포트 조회에 쓴다.
+     * 한계 확인을 위해 호출자가 limit+1 을 요청하면 잘림 여부를 알 수 있다. types 가 비어 있으면 빈 목록이다.
+     */
+    public List<SafetyFacility> findInBounds(List<String> facilityTypes, double minLat, double minLng,
+                                             double maxLat, double maxLng, int limit) {
+        if (facilityTypes.isEmpty()) return List.of();
+        String placeholders = String.join(", ", java.util.Collections.nCopies(facilityTypes.size(), "?"));
+        java.util.List<Object> args = new java.util.ArrayList<>(facilityTypes);
+        args.add(minLng);
+        args.add(minLat);
+        args.add(maxLng);
+        args.add(maxLat);
+        args.add(limit);
+        return jdbc.query(SELECT + "WHERE facility_type IN (" + placeholders + ") " +
+                "AND location && ST_MakeEnvelope(?, ?, ?, ?, 4326) ORDER BY id LIMIT ?",
+                rowMapper, args.toArray());
+    }
+
     public long countByDataSource(String dataSource) {
         Long n = jdbc.queryForObject("SELECT COUNT(*) FROM safety_facility WHERE data_source = ?",
                 Long.class, dataSource);

@@ -2,7 +2,9 @@ package com.flatmap.navigation.routescore;
 
 import com.flatmap.navigation.dto.RouteResponse;
 import com.flatmap.navigation.repository.SafetyFacilityRepository;
+import com.flatmap.navigation.repository.SteepSlopeAreaRepository;
 import com.flatmap.navigation.dto.WeatherInfo;
+import com.flatmap.navigation.service.SteepSlopeService;
 import com.flatmap.navigation.service.TMapRouteService;
 import com.flatmap.navigation.service.WeatherService;
 import com.flatmap.navigation.support.CountingDataSource;
@@ -159,7 +161,8 @@ class RouteScoringIntegrationTest {
         rain.setPrecipitationType(1);
         Mockito.when(weather.getWeather(Mockito.anyDouble(), Mockito.anyDouble())).thenReturn(rain);
 
-        SafeRouteService service = new SafeRouteService(tmap, counting, scorer, model, weather);
+        SafeRouteService service = new SafeRouteService(tmap, counting, scorer, model, weather,
+                new SteepSlopeService(new SteepSlopeAreaRepository(new JdbcTemplate(dataSource))));
         counted.reset();
         List<ScoredRoute> routes = service.findScoredRoutes(37.4, 127.1, 37.41, 127.1);
 

@@ -113,6 +113,11 @@ class TMapRouteServiceTest {
         assertThat(service.getWalkingRoute(127.1, 37.4, 127.1, 37.41, "SHORT").getTotalDistance()).isEqualTo(900);
 
         server.reset();
+        server.expect(requestTo(URL)).andExpect(jsonPath("$.searchOption").value("4"))
+                .andRespond(withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
+        assertThat(service.getWalkingRoute(127.1, 37.4, 127.1, 37.41, "MAIN_ROAD").getTotalDistance()).isEqualTo(900);
+
+        server.reset();
         server.expect(requestTo(URL)).andExpect(jsonPath("$.passList").value("127.1,37.405"))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST).body("secret-internal-detail").contentType(MediaType.TEXT_PLAIN));
         assertThatThrownBy(() -> service.getWalkingRoute(127.1, 37.4, 127.1, 37.41, "SAFE", "127.1,37.405"))

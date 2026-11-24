@@ -88,9 +88,11 @@ public class TMapRouteService {
     public RouteResponse getWalkingRoute(double originLng, double originLat,
                                           double destLng, double destLat,
                                           String option, String passList) {
-        // 옵션 매핑: SAFE→0(추천), SHORT→10(최단거리), FLAT→30(계단제외)
+        // 옵션 매핑: SAFE→0(추천), MAIN_ROAD→4(추천+대로우선), SHORT→10(최단거리), FLAT→30(계단제외)
         int searchOption = 0;
-        if ("SHORT".equals(option)) {
+        if ("MAIN_ROAD".equals(option)) {
+            searchOption = 4;
+        } else if ("SHORT".equals(option)) {
             searchOption = 10;
         } else if ("FLAT".equals(option)) {
             searchOption = 30;
