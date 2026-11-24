@@ -1,4 +1,7 @@
+import { ZONE_LAYERS, ZONE_KEYS, zoneMetaText } from '../../utils/zoneLayers';
+
 // 지도에 겹쳐 볼 수 있는 레이어. facility 는 /api/safety/facilities, density 는 /api/density-grid 에서 가져온다.
+// 사고다발지·보호구역·복지시설·그늘막·노인복지관(ZONE_LAYERS)은 FlatMap 안전정보 레이어이며 위치 안내용이다.
 export const FACILITY_LAYERS = [
   { key: 'CCTV', label: 'CCTV', meta: '방범용 카메라', color: '#5a7ab8', symbol: '●' },
   { key: 'SECURITY_LIGHT', label: '보안등', meta: '야간 조명', color: '#c8942a', symbol: '▲' },
@@ -13,7 +16,7 @@ export const AREA_LAYERS = [
 // 카카오 지도 레벨 5 이하(확대)에서만 시설이 불러와진다 — FacilityOverlay 와 같은 기준
 export const FACILITY_MAX_LEVEL = 5;
 
-function Tile({ label, meta, color, symbol, active, onClick }) {
+function Tile({ label, meta, color, symbol, active, onClick, activeMeta = false }) {
   return (
     <button
       onClick={onClick}
@@ -53,15 +56,18 @@ function Tile({ label, meta, color, symbol, active, onClick }) {
       <span style={{ minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: 14, fontWeight: 800 }}>{label}</span>
         <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: active ? '#626a75' : '#858b95' }}>
-          {active ? meta : '현재 숨김'}
+          {activeMeta ? meta : (active ? meta : '현재 숨김')}
         </span>
       </span>
     </button>
   );
 }
 
-export default function LayerPanel({ layers, onToggle, onToggleAllFacilities, zoom, facilityTruncated, steepCount }) {
+export default function LayerPanel({
+  layers, onToggle, onToggleAllFacilities, onToggleAllZones, zoom, facilityTruncated, steepCount, zoneCounts = {},
+}) {
   const allFacilitiesOn = FACILITY_LAYERS.every((f) => layers[f.key]);
+  const allZonesOn = ZONE_KEYS.every((k) => layers[k]);
   const anyFacilityOn = FACILITY_LAYERS.some((f) => layers[f.key]);
   const tooFar = (anyFacilityOn || layers.DENSITY) && zoom != null && zoom > FACILITY_MAX_LEVEL;
 
@@ -97,6 +103,29 @@ export default function LayerPanel({ layers, onToggle, onToggleAllFacilities, zo
           급경사지 경고는 붕괴위험으로 지정된 곳만 모은 표본{steepCount != null ? ` ${steepCount}건` : ''}이며, 보행 난이도와는 별개입니다.
         </p>
       )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#30343d' }}>생활·보호 정보</div>
+          <div style={{ fontSize: 12.5, color: '#656c77', marginTop: 2 }}>위치 안내용이며 경로 점수에는 반영되지 않습니다</div>
+        </div>
+        <button className="layer-all-button" data-on={allZonesOn} onClick={onToggleAllZones}>
+          {allZonesOn ? '모두 숨김' : '모두 보기'}
+        </button>
+      </div>
+      <div className="facility-grid zone-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        {ZONE_LAYERS.map((z) => (
+          <Tile
+            key={z.key}
+            label={z.label}
+            meta={zoneMetaText(z, !!layers[z.key], zoneCounts[z.key])}
+            color={z.color}
+            symbol={z.symbol}
+            active={!!layers[z.key]}
+            activeMeta
+            onClick={() => onToggle(z.key)}
+          />
+        ))}
+      </div>
     </div>
   );
 }

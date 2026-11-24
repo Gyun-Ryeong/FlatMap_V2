@@ -239,19 +239,19 @@ class WalkRouteEndpointTest {
     }
 
     @Test
-    void detourThatLosesTooMuchScoreReturnsTheOriginal() throws Exception {
+    void detourIsAdoptedByRiskSectionsAloneAndTheLowerScoreIsReportedNotHidden() throws Exception {
         insertSteepSlope(ROUTE_LAT + 0.0009, 127.1100);
         insertCctvAlongOriginalRoute(21);        // 원경로에만 CCTV 21개(약 12/km → A 약 64점), 우회 경로는 0점
         tmapReturns(eastRoute(ROUTE_LAT, 1800), eastRoute(DETOUR_LAT, 2300));
 
         mvc.perform(post("/api/route/walk/detour").contentType(MediaType.APPLICATION_JSON).content(DETOUR_BODY))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.detourApplied").value(false))
-                .andExpect(jsonPath("$.detourMessage").value(containsString("점수가 크게 낮아져")))
-                .andExpect(jsonPath("$.totalDistance").value(1800))
-                .andExpect(jsonPath("$.cctvCount").doesNotExist())
-                .andExpect(jsonPath("$.totalScore").value(org.hamcrest.Matchers.greaterThan(50.0)))
-                .andExpect(jsonPath("$.originalTotalScore").value(org.hamcrest.Matchers.greaterThan(50.0)));
+                .andExpect(jsonPath("$.detourApplied").value(true))
+                .andExpect(jsonPath("$.totalDistance").value(2300))
+                .andExpect(jsonPath("$.riskSections.length()").value(0))
+                // 우회 경로는 시설이 없어 점수가 크게 낮지만 채택되고, 두 점수가 모두 내려간다
+                .andExpect(jsonPath("$.originalTotalScore").value(org.hamcrest.Matchers.greaterThan(50.0)))
+                .andExpect(jsonPath("$.totalScore").value(0.0));
     }
 
     @Test

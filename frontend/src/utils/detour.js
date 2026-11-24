@@ -1,6 +1,6 @@
 // 후보 경로(T Map searchOption 코드) → 우회 요청이 쓰는 옵션 이름. 우회 요청은 원경로를 같은 옵션으로 다시 조회해
 // 비교하므로, 사용자가 고른 후보와 같은 옵션을 써야 경로 인덱스(nearestRouteIdx)가 맞는다.
-const OPTION_BY_SEARCH_CODE = { 0: 'SAFE', 4: 'MAIN_ROAD', 10: 'SHORT' };
+const OPTION_BY_SEARCH_CODE = { 0: 'SAFE', 4: 'MAIN_ROAD', 10: 'SHORT', 30: 'FLAT' };
 
 export function detourOptionFor(searchOptionCode) {
   return OPTION_BY_SEARCH_CODE[searchOptionCode] ?? 'SAFE';

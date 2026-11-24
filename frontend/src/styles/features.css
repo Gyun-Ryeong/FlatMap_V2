@@ -110,3 +110,41 @@
   margin-top: 1px; padding: 1px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.92); border: 1px solid #e6d8b2;
   font-size: 11px; font-weight: 700; color: #5c4a14; white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* FlatMap 안전정보 레이어(사고다발지·보호구역·복지시설·그늘막·노인복지관) 마커 — 원본 FlatMap 과 같은 원형 마커 */
+.layer-marker-wrap { cursor: pointer; }
+.layer-marker-circle {
+  width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; border: 1.5px solid #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); transition: transform 0.15s;
+}
+.layer-marker-wrap:hover .layer-marker-circle { transform: scale(1.25); }
+.layer-info-header.zone { background: #eef2f8; color: #27456f; }
+.layer-info-header.zone .layer-info-close { color: #27456f; }
+
+/* 오르막길 구간 목록(FlatMap 오르막길 탭 복원) */
+.steep-list-body { margin-top: 6px; padding: 10px 12px; background: #f6f7f9; border: 1px solid #e4e6eb; border-radius: 8px; }
+.steep-list-desc { margin: 0 0 8px; font-size: 13px; color: #606874; line-height: 1.6; }
+.steep-list-terrain { color: #2f6b4f; font-weight: 700; }
+.steep-list-warn { color: #b45309; font-weight: 700; }
+.steep-list-note { margin: 6px 0; font-size: 13px; color: #6b7480; line-height: 1.5; }
+.steep-filter-row { display: flex; gap: 6px; margin-bottom: 8px; }
+.steep-filter-select {
+  flex: 1; min-height: 40px; padding: 6px 10px; border: 1.5px solid #cfd4dd; border-radius: 8px; background: white;
+  color: #4f5662; font-size: 13.5px; font-family: inherit; cursor: pointer;
+}
+.steep-segment-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+.steep-segment-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 52px; padding: 10px 12px;
+  background: white; border: 1.5px solid #e0e3e8; border-radius: 9px; cursor: pointer; text-align: left; font-family: inherit;
+}
+.steep-segment-item:hover:not(:disabled) { border-color: #7e9bc4; background: #f3f7fc; }
+.steep-segment-item:disabled { opacity: 0.55; cursor: default; }
+.steep-segment-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.steep-segment-name { font-size: 14px; font-weight: 800; color: #30343d; }
+.steep-segment-city { font-size: 12px; color: #6b7480; }
+.steep-terrain-tag {
+  display: inline-block; margin-right: 5px; padding: 1px 5px; border-radius: 3px; background: #e6f2ea; color: #2f6b4f;
+  border: 1px solid #b9dcc7; font-size: 10px; font-weight: 700; vertical-align: middle;
+}
+.steep-grade-badge { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #7a3d0c; background: #fdf1e6; padding: 3px 8px; border-radius: 6px; }
+.steep-grade-badge.unknown { color: #6b7280; background: #f2f3f5; border: 1px dashed #c4c8ce; padding: 2px 7px; }

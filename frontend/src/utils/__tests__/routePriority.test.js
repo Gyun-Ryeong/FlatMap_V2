@@ -3,6 +3,39 @@ import { pickRouteByPriority, PRIORITY_OPTIONS } from '../routePriority';
 
 const route = (routeId, totalScore, totalTime, recommended = false) => ({ routeId, totalScore, totalTime, recommended });
 
+const withWalk = (routeId, walkScore, totalScore, totalTime, code = 0) => ({
+  routeId, totalScore, totalTime, searchOptionCode: code,
+  breakdown: [{ axis: 'A', score: totalScore }, ...(walkScore == null ? [] : [{ axis: 'B', score: walkScore }])],
+});
+
+describe('오르막 최소(FlatMap FLAT 옵션 복원)', () => {
+  it('선택지에 FlatMap 이름 그대로 "오르막 최소"가 있다', () => {
+    expect(PRIORITY_OPTIONS.map((o) => o.label)).toEqual(['안전 우선', '균형', '빠른 길', '오르막 최소']);
+  });
+
+  it('보행난이도(B축) 점수가 가장 높은 경로를 고른다(총점이 아니라)', () => {
+    const routes = [withWalk('a', 40, 90, 1000), withWalk('b', 85, 50, 1500), withWalk('c', 60, 70, 900, 30)];
+    expect(pickRouteByPriority(routes, 'flat').routeId).toBe('b');
+    expect(pickRouteByPriority(routes, 'safety').routeId).toBe('a');   // 안전 우선은 총점 기준 그대로
+  });
+
+  it('B 점수가 같으면 총점, 그다음 시간이 짧은 쪽', () => {
+    expect(pickRouteByPriority([withWalk('a', 70, 50, 900), withWalk('b', 70, 60, 1200)], 'flat').routeId).toBe('b');
+    expect(pickRouteByPriority([withWalk('a', 70, 60, 1200), withWalk('b', 70, 60, 900)], 'flat').routeId).toBe('b');
+  });
+
+  it('B축이 없는 경로는 후보에서 빼고, 모두 없으면 계단 제외(30) 경로 → 추천 경로 순으로 대신한다', () => {
+    const partial = [withWalk('a', null, 95, 900), withWalk('b', 30, 40, 1500)];
+    expect(pickRouteByPriority(partial, 'flat').routeId).toBe('b');
+
+    const none = [withWalk('a', null, 95, 900), withWalk('b', null, 40, 1500, 30), withWalk('c', null, 60, 1000)];
+    expect(pickRouteByPriority(none, 'flat').routeId).toBe('b');
+
+    const noStairs = [withWalk('a', null, 60, 900), { ...withWalk('b', null, 40, 1500), recommended: true }];
+    expect(pickRouteByPriority(noStairs, 'flat').routeId).toBe('b');
+  });
+});
+
 describe('pickRouteByPriority', () => {
   const routes = [route('a', 60, 1200), route('b', 80, 1800, true), route('c', 40, 900)];
 
@@ -57,7 +90,7 @@ describe('pickRouteByPriority', () => {
     expect(routes.map((r) => r.routeId)).toEqual(before);
   });
 
-  it('선택지는 안전 우선 / 균형 / 빠른 길 세 개', () => {
-    expect(PRIORITY_OPTIONS.map((o) => o.label)).toEqual(['안전 우선', '균형', '빠른 길']);
+  it('선택지는 안전 우선 / 균형 / 빠른 길 / 오르막 최소 네 개', () => {
+    expect(PRIORITY_OPTIONS.map((o) => o.label)).toEqual(['안전 우선', '균형', '빠른 길', '오르막 최소']);
   });
 });

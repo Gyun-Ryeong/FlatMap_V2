@@ -31,6 +31,13 @@ export async function fetchSteepSlopes(regionCode = '411') {
   return res.data;
 }
 
+// GET /api/safety/{accident-zones|protected-zones|welfare-facilities|shade-shelters|senior-centers}
+// → [{ id, name, latitude, longitude, type?, address?, phone?, regionCode }]. 위치 안내용 레이어이며 점수에 쓰지 않는다.
+export async function fetchZoneItems(endpoint, signal) {
+  const res = await axiosInstance.get(endpoint, { signal });
+  return res.data;
+}
+
 // GET /api/weather — 실패하면 null (화면은 날씨 없이도 동작한다)
 export async function fetchWeather(lat, lng) {
   try {

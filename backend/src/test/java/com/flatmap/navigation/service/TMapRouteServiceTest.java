@@ -56,16 +56,18 @@ class TMapRouteServiceTest {
     }
 
     @Test
-    void requestsThreeCandidatesWithSearchOptions0_4_10InOrder() throws Exception {
+    void requestsFourCandidatesWithSearchOptions0_4_10_30InOrder() throws Exception {
         expectOption(0, withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
         expectOption(4, withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
         expectOption(10, withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
+        expectOption(30, withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
 
         List<TMapRouteService.CandidateRoute> result = service.getCandidateRoutes(37.4, 127.1, 37.41, 127.1);
 
         server.verify();
-        assertThat(result).extracting(TMapRouteService.CandidateRoute::searchOption).containsExactly(0, 4, 10);
-        assertThat(result).extracting(TMapRouteService.CandidateRoute::name).containsExactly("일반", "대로우선", "최단");
+        assertThat(result).extracting(TMapRouteService.CandidateRoute::searchOption).containsExactly(0, 4, 10, 30);
+        assertThat(result).extracting(TMapRouteService.CandidateRoute::name)
+                .containsExactly("일반", "대로우선", "최단", "계단 제외");
         RouteResponse first = result.get(0).route();
         assertThat(first.getTotalDistance()).isEqualTo(900);
         assertThat(first.getTotalDuration()).isEqualTo(700);
@@ -79,11 +81,12 @@ class TMapRouteServiceTest {
         expectOption(0, withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
         expectOption(4, withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
         expectOption(10, withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
+        expectOption(30, withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
 
         List<TMapRouteService.CandidateRoute> result = service.getCandidateRoutes(37.4, 127.1, 37.41, 127.1);
 
         server.verify();
-        assertThat(result).extracting(TMapRouteService.CandidateRoute::searchOption).containsExactly(0, 10);
+        assertThat(result).extracting(TMapRouteService.CandidateRoute::searchOption).containsExactly(0, 10, 30);
     }
 
     @Test
@@ -91,6 +94,7 @@ class TMapRouteServiceTest {
         expectOption(0, withSuccess("not json at all", MediaType.APPLICATION_JSON));
         expectOption(4, withSuccess("{\"features\":[]}", MediaType.APPLICATION_JSON));
         expectOption(10, withSuccess(OK_BODY, MediaType.APPLICATION_JSON));
+        expectOption(30, withStatus(HttpStatus.BAD_GATEWAY));
 
         List<TMapRouteService.CandidateRoute> result = service.getCandidateRoutes(37.4, 127.1, 37.41, 127.1);
 
@@ -102,6 +106,7 @@ class TMapRouteServiceTest {
         expectOption(0, withStatus(HttpStatus.UNAUTHORIZED));
         expectOption(4, withStatus(HttpStatus.UNAUTHORIZED));
         expectOption(10, withStatus(HttpStatus.UNAUTHORIZED));
+        expectOption(30, withStatus(HttpStatus.UNAUTHORIZED));
 
         assertThat(service.getCandidateRoutes(37.4, 127.1, 37.41, 127.1)).isEmpty();
     }

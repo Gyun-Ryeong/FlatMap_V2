@@ -6,6 +6,7 @@ import WeatherCard from '../Weather/WeatherCard';
 import ScoreGuide from '../Panel/ScoreGuide';
 import RouteOptions from '../Panel/RouteOptions';
 import LayerPanel from '../Panel/LayerPanel';
+import { SteepSlopeListBody } from '../Panel/SteepSlopeList';
 import HomeScreen from '../Home/HomeScreen';
 import PlaceShortcuts from '../Panel/PlaceShortcuts';
 
@@ -76,6 +77,20 @@ describe('경로 카드·상세 렌더', () => {
     expect(html).toContain('점수 74.6 → 70.1');
   });
 
+  it('우회 경로 점수가 원경로보다 낮으면 숨기지 않고 알린다(점수는 채택 기준이 아님)', () => {
+    const lower = {
+      status: 'done',
+      message: '',
+      data: { totalDistance: 2800, totalDuration: 2000, riskSections: [], totalScore: 50, originalTotalScore: 74.6 },
+    };
+    const html = renderToStaticMarkup(<RouteDetail route={route} detour={lower} onRequestDetour={() => {}} />);
+    expect(html).toContain('점수 74.6 → 50.0');
+    expect(html).toContain('24.6점 낮습니다');
+    expect(html).toContain('채택 기준이 아니므로');
+    const higher = { ...lower, data: { ...lower.data, totalScore: 80 } };
+    expect(renderToStaticMarkup(<RouteDetail route={route} detour={higher} onRequestDetour={() => {}} />)).not.toContain('낮습니다');
+  });
+
   it('우회 거절 사유는 서버 문구 그대로 보여 준다', () => {
     const html = renderToStaticMarkup(
       <RouteDetail route={route} detour={{ status: 'rejected', data: null, message: '더 안전한 우회 경로를 찾지 못했습니다.' }} onRequestDetour={() => {}} />
@@ -119,6 +134,7 @@ describe('문구 규칙 (미구현 기능을 있는 것처럼 쓰지 않는다)'
     expect(html).toContain('안전 우선');
     expect(html).toContain('균형');
     expect(html).toContain('빠른 길');
+    expect(html).toContain('오르막 최소');
   });
 
   it('점수 내역: 보행난이도(B축)는 구간 비율·기준 각도·평균/최대 경사를 보여 준다', () => {
@@ -163,6 +179,64 @@ describe('문구 규칙 (미구현 기능을 있는 것처럼 쓰지 않는다)'
     expect(html).toContain('붕괴위험으로 지정된 곳만 모은 표본 88건');
     expect(html).toContain('보행 난이도와는 별개');
     expect(html).not.toMatch(/위험 구역|위험구역/);
+  });
+
+  it('레이어 패널: FlatMap 안전정보 5종을 같은 타일로 보여 주고, 데이터가 없으면 그렇게 알린다', () => {
+    const layers = {
+      CCTV: true, SECURITY_LIGHT: true, POLICE: true, DENSITY: false, STEEP: false,
+      ACCIDENT: true, PROTECTED: true, WELFARE: false, SHELTER: true, SENIOR: false,
+    };
+    const html = renderToStaticMarkup(
+      <LayerPanel
+        layers={layers} onToggle={() => {}} onToggleAllFacilities={() => {}} onToggleAllZones={() => {}}
+        zoom={4} facilityTruncated={false} steepCount={null}
+        zoneCounts={{ ACCIDENT: 0, PROTECTED: 12, SHELTER: null }}
+      />
+    );
+    ['사고다발지', '교통약자 보호구역', '장애인복지시설', '그늘막', '노인복지관'].forEach((label) => {
+      expect(html).toContain(label);
+    });
+    expect(html).toContain('생활·보호 정보');
+    expect(html).toContain('경로 점수에는 반영되지 않습니다');
+    expect(html).toContain('등록된 데이터 없음');        // 사고다발지: 0건
+    expect(html).toContain('12곳');                       // 보호구역: 12건
+    expect(html).toContain('불러오지 못했습니다');         // 그늘막: 실패
+    expect(html).toContain('현재 숨김');                  // 꺼진 레이어
+    expect(html).not.toMatch(/위험 구역|위험구역|위험도/);
+  });
+
+  it('오르막길 구간 목록: 등급 없이 경사도(°)·미측정·산지형만, 보행난이도와 별개임을 밝힌다', () => {
+    const items = [
+      { id: 1, name: '신흥 급경사지', grade: 12.34, isMountain: false, sigungu: '성남시 수정구', eupmyeon: '신흥동', jibun: '1', latitude: 37.4, longitude: 127.1 },
+      { id: 2, name: '산 지번 급경사지', grade: null, isMountain: true, regionCode: '41135', latitude: 37.3, longitude: 127.1 },
+    ];
+    const html = renderToStaticMarkup(
+      <SteepSlopeListBody
+        items={items} loading={false} error={null} region="411" onRegionChange={() => {}}
+        sort="grade" onSortChange={() => {}} onPick={() => {}}
+      />
+    );
+    expect(html).toContain('2건');
+    expect(html).toContain('산지형 1건');
+    expect(html).toContain('경사도 미측정 1건');
+    expect(html).toContain('경사 12.3°');
+    expect(html).toContain('경사 미측정');
+    expect(html).toContain('성남시 수정구 신흥동 1');
+    expect(html).toContain('보행난이도와는 별개');
+    expect(html).not.toMatch(/risk-badge|riskLevel/);
+    // 경사 큰 순: 측정값이 있는 항목이 앞
+    expect(html.indexOf('신흥 급경사지')).toBeLessThan(html.indexOf('산 지번 급경사지'));
+  });
+
+  it('오르막길 구간 목록: 데이터가 없으면 안내, 오류면 일반화된 문구', () => {
+    const base = { loading: false, region: '411', onRegionChange: () => {}, sort: 'grade', onSortChange: () => {}, onPick: () => {} };
+    const empty = renderToStaticMarkup(<SteepSlopeListBody items={[]} error={null} {...base} />);
+    expect(empty).toContain('조건에 맞는 데이터가 없습니다');
+    const failed = renderToStaticMarkup(
+      <SteepSlopeListBody items={[]} error="급경사지 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." {...base} />
+    );
+    expect(failed).toContain('불러오지 못했습니다');
+    expect(failed).not.toContain('조건에 맞는 데이터가 없습니다');
   });
 
   it('즐겨찾기: 로그인 전에는 로그인 안내', () => {

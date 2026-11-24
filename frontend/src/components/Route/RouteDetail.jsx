@@ -53,6 +53,11 @@ function DetourResult({ route, data }) {
       {data.riskSections.length > 0 && (
         <p className="route-detail-note">경고 구간을 완전히 피하지는 못했습니다. 주의해서 이동하세요.</p>
       )}
+      {before != null && after != null && after < before && (
+        <p className="route-detail-note">
+          우회 경로는 경고 구간을 줄이지만 경로 점수가 원경로보다 {(before - after).toFixed(1)}점 낮습니다. 점수는 우회 채택 기준이 아니므로 두 경로를 비교해 고르세요.
+        </p>
+      )}
     </div>
   );
 }
