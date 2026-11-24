@@ -1,0 +1,24 @@
+# 이미지 빌드 컨텍스트에서 제외한다. 특히 비밀값과 큰 파일이 이미지에 들어가지 않게 한다.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+**/application-local.*
+*.pem
+*.key
+*.p12
+*.jks
+
+# 로컬 산출물·대용량(DEM 래스터는 이미지가 아니라 볼륨으로 준다)
+target/
+logs/
+dem/
+*.tif
+*.tiff
+*.dump
+.idea/
+.vscode/
+.git/
+Dockerfile
+.dockerignore

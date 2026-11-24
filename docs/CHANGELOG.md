@@ -2,6 +2,46 @@
 
 > 단계 번호: 아래 "1단계 — 통합 스키마…" 는 로드맵의 00(foundation) 이다. 로드맵 01(ingestion)은 이 문서 맨 위 항목이다.
 
+## 08 단계 — 배포 준비 (deploy) (2026-11-17) — 문서·이미지 정의 준비 완료, 이미지 빌드는 Docker 가 없어 실행하지 못함, 실제 배포는 하지 않음
+
+클라우드에 종속되지 않는 배포 산출물(Dockerfile 2개, 운영/개발 compose, 환경변수 문서, 배포 가이드)을 준비했다. **실제 배포는 하지 않았고 배포 대상 클라우드는 정해지지 않았다.** 플랫폼 이름은 아직 `[이름 미정]`이다. **점수는 검증되지 않은 설계 파라미터이며 위험도·안전도가 아니다.** RAG 는 개발 중이며 아직 연동되지 않았다.
+
+### 추가됨
+
+- **`backend/Dockerfile`**: 멀티스테이지(Maven 3.9 + JDK 17 빌드 → `eclipse-temurin:17-jre-alpine` 실행), 비루트 사용자, 운영 프로필 기본, readiness 헬스체크. 비밀값은 이미지에 없고 실행할 때 환경변수로 주입한다.
+- **`frontend/Dockerfile` + `frontend/nginx/default.conf.template`**: 멀티스테이지(Node 22 + Vite 빌드 → `nginx-unprivileged`, 8080), `/api` 는 같은 출처로 백엔드에 프록시(요청 때마다 DNS 재해석 — 백엔드 컨테이너만 다시 만들어져도 502 가 나지 않게). **관리용 경로(`/api/data/*`, `/api/walk-difficulty/*`, `/api/safety`·`/api/steep-slope`·`/api/density-grid` 의 쓰기)는 공개 주소에서 막는다.** 보안 헤더(nosniff, Referrer-Policy, X-Frame-Options).
+- **`docker-compose.prod.yml`(운영)**: DB(PostGIS 16) 포트를 호스트에 열지 않고, 백엔드는 호스트의 `127.0.0.1` 에만 열며(서버 안 관리용 호출), 공개 진입점은 프론트 하나. 필수 변수가 없으면 시작하지 않고, 환경변수는 전부 `.env` 참조(compose 에 비밀값 리터럴 없음), `cap_drop: ALL`, `no-new-privileges`, 로그 회전. 데이터 파일(DEM·CSV)은 이미지가 아니라 읽기 전용 볼륨(`DATA_DIR`).
+- **`docker-compose.yml`(개발)**: 기본은 DB 만, `--profile stack` 이면 전체 스택을 개발 설정(HTTP, localhost)으로.
+- **`.dockerignore`**: `.env`·`application-local.*`·DEM·`target/` 가 이미지 빌드 컨텍스트에 들어가지 않는다.
+- **`docs/ENVIRONMENT.md`**: 키 이름·용도·필수 여부(값 없음). **`docs/DEPLOY.md`**: 이미지 빌드, 시크릿 생성 방법, 카카오 콘솔 설정, DB 초기화(Flyway 자동), 헬스체크, 첫 데이터 채우기, 운영(백업·업데이트·롤백), 문제 해결, 사용자가 채울 값. README 에 배포 섹션.
+- **CI**: Docker 이미지 빌드, 운영 compose 검증(더미 값), 비루트 확인 잡(`docker`). 배포 파일을 작성한 PC 에는 Docker 가 없어 **첫 push 에서 처음 실행된다.**
+- **테스트**(백엔드 391 → 423개, 프론트 88 → 91개): 배포 파일 구조 검사(`DeployFilesTest` — DB 포트 비공개, 비루트, 시크릿 리터럴 없음, 필수 변수 강제, 관리 경로 차단, Dockerfile 명령어 문법, ngrok·하드코딩 호스트 없음), 환경변수 문서가 `.env.example`·compose·`application*.properties` 가 읽는 변수와 일치하는지(`EnvDocsConsistencyTest`), 운영 설정 검사, 헬스체크, 쿠키 속성, 로그인 주소. 위험한 변경(DB 포트 공개, `USER root`, 시크릿 리터럴, 필수 변수 제거, 깨진 Dockerfile 줄)을 일부러 넣어 테스트가 실패하는 것을 확인한 뒤 원복했다.
+
+### 변경됨 (운영 배포를 위해 제가 판단해서 넣은 것 — 사용자 승인 전)
+
+- **ngrok**: 추적 파일에는 이미 없었다(05 단계에서 정리됨). 이번에 저장소 전체에 ngrok 참조가 다시 들어오지 못하게 테스트로 고정했다.
+- **로그인 주소 기본값**: 프론트의 카카오 로그인 시작 주소가 `http://localhost:8080` 으로 하드코딩돼 있어 환경변수를 안 주면 운영에서도 localhost 를 가리켰다. 기본을 같은 출처(`/api/auth/kakao/login`)로 바꿨다(운영은 nginx, 개발은 Vite 프록시가 처리). `VITE_BACKEND_URL` 은 백엔드가 다른 출처일 때만 쓰는 선택값이다.
+- **헬스체크**: `spring-boot-starter-actuator` 를 추가하고 `health` 만 연다(DB 포함, 세부 정보 없음, liveness/readiness). 다른 actuator 경로는 404.
+- **운영 프로필(`prod`)**: `FRONTEND_URL`·`KAKAO_OAUTH_REDIRECT_URI` 의 개발용 기본값(localhost)을 없애고, 기동 시 설정을 검사한다(localhost 주소, 32바이트 미만 JWT 비밀, 16자 미만 관리 키면 기동 실패, 메시지에는 설정 이름만). 파일 로그를 끄고(표준 출력) 앱 로그 수준을 INFO 로 둔다(기본 설정은 DEBUG).
+- **로그인 쿠키**: `SameSite=Lax` 를 붙이고, 운영(HTTPS)에서는 `Secure` 를 붙인다(`app.cookie-secure`, 운영 기본 true). 개발(HTTP)은 그대로 동작.
+
+### 검증 (Docker 없이 할 수 있는 만큼)
+
+- **패키징한 JAR 를 `.env` 없는 빈 디렉터리에서 환경변수만으로 운영 프로필로 기동**: 빈 DB 에 Flyway 가 V1~V5 를 적용하고 기동 성공. `/actuator/health`·liveness·readiness 가 UP, 다른 actuator 경로 404, 로그아웃 쿠키가 실제 Tomcat 응답에서 `Secure; HttpOnly; SameSite=Lax`, 관리 API 는 키 없음·틀린 키 401, 맞는 키 200, CORS 는 `FRONTEND_URL` 출처만 허용. 파일 로그가 생기지 않았고 로그에 DEBUG 줄 0건, JWT 비밀·관리 키·DB 비밀번호가 로그에 0건.
+- **잘못된 운영 설정은 기동하지 않음**: `FRONTEND_URL` 누락 → 실패(플레이스홀더 오류), localhost 주소 + 짧은 JWT 비밀 + 빈 관리 키 → "운영 설정이 올바르지 않습니다: …" 로 실패하고 로그에 값이 없음.
+- 새로 clone 한 작업 트리(`.env` 없음)에서 CI 와 같은 명령 통과: `./mvnw -B -ntp verify` 423개(1개 건너뜀: DEM 파일이 있을 때만 도는 대조 테스트), `npm ci`·`npm test` 91개·`npm run build`, 위생 점검. Dockerfile 의 의존성 선받기(`dependency:go-offline`)와 `package -DskipTests` 도 같은 명령으로 확인.
+- 이 검증을 위해 테스트 DB(`flatmapv2_test`)의 앱 소유 테이블을 지웠다(PostGIS 확장은 그대로). 테스트 DB 는 테스트 실행마다 비워지는 용도다.
+- **저장소 위생 점검**(새 배포 파일 포함): 비밀값 정확 일치(알려진 값 18개)·패턴·올라가면 안 되는 파일명·대용량(허용 목록 1건 외) 모두 0건.
+
+### 확인하지 못한 것 / 한계
+
+- **이미지 빌드, `docker compose up`(개발·운영 모두), 컨테이너 헬스체크, nginx 컨테이너의 실제 프록시·SPA 동작은 한 번도 실행하지 못했다**(Docker 없음). 위 검증은 파일 구조·문법과 JAR 기동까지다. nginx 설정 문법(`nginx -t`)도 확인하지 못했다. CI 의 `docker` 잡이 첫 push 에서 이미지 빌드와 일부를 확인한다.
+- GitHub Actions 는 여전히 한 번도 실행되지 않았다(07 단계와 같음).
+- 운영 compose 는 `POSTGRES_USER`(슈퍼유저) 하나를 앱 계정으로 쓴다. 최소 권한(비슈퍼유저 + 사전 생성된 PostGIS 확장)은 가이드에 권고만 적었다.
+- TLS 는 이 스택에 없다(앞단에서 처리). 로그인 쿠키가 `Secure` 라 HTTPS 가 아니면 로그인이 되지 않는다.
+- `GYEONGGI_SECURITY_LIGHT_API_KEY`·`GYEONGGI_ACCIDENT_ICY_API_KEY`·`GYEONGGI_ACCIDENT_NORMAL_API_KEY`·`GYEONGGI_SENIOR_WELFARE_API_KEY`·`GYEONGGI_SENIOR_CENTER_API_KEY` 는 설정으로 읽기만 하고 호출하는 코드가 없다. 문서에 "현재 코드에서 사용하지 않음"으로 표시했고 삭제는 하지 않았다(사용자 판단).
+- 관리용 호출은 공개 주소에서 막혀 서버 안(`127.0.0.1`)에서만 가능하다. 클라우드에서 서버에 접속할 수 없는 구조면 일회성 작업 수단이 필요하다(가이드 12절).
+
 ## 07 단계 — 품질과 문서 (quality-docs) (2026-11-17) — 구현·로컬 검증 완료, GitHub Actions 실행은 push 후 확인 필요
 
 CI, 핵심 로직 테스트 보강, README, 저장소 위생 점검을 마쳤다. **점수는 검증되지 않은 설계 파라미터이며 위험도·안전도가 아니다.** RAG 는 개발 중이며 아직 연동되지 않았다.

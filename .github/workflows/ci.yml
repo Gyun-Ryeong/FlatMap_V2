@@ -71,6 +71,43 @@ jobs:
       - name: Build (Vite)
         run: npm run build
 
+  docker:
+    # 이미지 빌드와 운영 compose 검증. 배포 파일을 작성한 PC 에는 Docker 가 없어 여기서 처음 실행된다.
+    name: docker images + prod compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate docker-compose.prod.yml (dummy values, only checks the file)
+        env:
+          DB_NAME: ci_db
+          DB_USERNAME: ci_user
+          DB_PASSWORD: ci_only_password
+          FRONTEND_URL: https://map.example.org
+          KAKAO_OAUTH_REDIRECT_URI: https://map.example.org/api/auth/kakao/callback
+          JWT_SECRET: ci-dummy-jwt-secret-for-compose-validation-only
+          ADMIN_API_KEY: ci-dummy-admin-key-for-validation
+          VITE_KAKAO_API_KEY: ci-dummy-js-key
+        run: |
+          touch .env
+          docker compose -f docker-compose.prod.yml config --quiet
+          docker compose --profile stack config --quiet
+      - name: Build backend image
+        run: docker build -t flatmap-backend:ci ./backend
+      - name: Build frontend image
+        run: docker build -t flatmap-frontend:ci --build-arg VITE_KAKAO_API_KEY=ci-dummy-js-key ./frontend
+      - name: Frontend image serves the app as a non-root user
+        run: |
+          docker run -d --name fe -e BACKEND_URL=http://127.0.0.1:9 flatmap-frontend:ci
+          for i in $(seq 1 15); do
+            curl -fsS http://$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' fe):8080/ -o /dev/null && break
+            sleep 1
+          done
+          curl -fsS http://$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' fe):8080/some/spa/route | grep -qi "<div id=\"root\""
+          test "$(docker exec fe id -u)" != "0"
+      - name: Backend image runs as a non-root user
+        run: test "$(docker run --rm --entrypoint id flatmap-backend:ci -u)" != "0"
+
   hygiene:
     name: repository hygiene
     runs-on: ubuntu-latest

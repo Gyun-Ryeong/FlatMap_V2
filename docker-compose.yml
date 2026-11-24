@@ -1,9 +1,14 @@
-# 로컬 개발용 PostgreSQL + PostGIS
+# 개발용. 기본은 로컬 PostgreSQL + PostGIS 만 띄운다(백엔드·프론트는 호스트에서 mvnw / npm run dev 로 실행).
 #   cp .env.example .env   # 값을 채운 뒤
 #   docker compose up -d
 #
+# 전체 스택(DB + 백엔드 + 프론트)을 개발 설정(HTTP, localhost)으로 컨테이너에서 확인하려면 stack 프로필을 켠다:
+#   docker compose --profile stack up -d --build      # 프론트 http://localhost:3000, 백엔드 http://localhost:8080
+# 운영 배포용은 이 파일이 아니라 docker-compose.prod.yml 이다(docs/DEPLOY.md).
+#
 # 포트 기본값은 5433 이다. 호스트에 이미 PostgreSQL 이 5432 를 쓰고 있어도 충돌하지 않는다.
 # 같은 서버에 테스트용 DB(<DB_NAME>_test)도 함께 만든다 (docker/initdb/01-create-test-db.sh).
+# 주의: 이 파일은 stack 프로필을 켜지 않아도 파일 전체의 ${변수}를 치환한다. 그래서 stack 서비스에는 필수 변수 강제(VAR:? 문법)를 추가하지 않는다(DB 서비스의 필수 3개는 원래부터).
 services:
   db:
     image: postgis/postgis:16-3.4
@@ -23,6 +28,39 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # ---- 전체 스택(개발 설정). 기본으로는 뜨지 않고 --profile stack 일 때만 뜬다 ----
+  backend:
+    profiles: ["stack"]
+    build:
+      context: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # 이미지는 운영 프로필이 기본이라 개발 설정(localhost 허용, HTTP 쿠키)을 쓰려면 비워 준다.
+      SPRING_PROFILES_ACTIVE: ""
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    ports:
+      - "8080:8080"
+
+  frontend:
+    profiles: ["stack"]
+    build:
+      context: ./frontend
+      args:
+        VITE_KAKAO_API_KEY: ${VITE_KAKAO_API_KEY:-}
+        VITE_API_BASE_URL: ""
+        VITE_BACKEND_URL: ""
+    environment:
+      BACKEND_URL: http://backend:8080
+    depends_on:
+      - backend
+    ports:
+      - "3000:8080"
 
 volumes:
   flatmap_pgdata:

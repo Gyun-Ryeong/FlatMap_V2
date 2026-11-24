@@ -31,6 +31,9 @@ secrets/
 *.sql.gz
 *.bak
 
+# 배포 서버에서 DEM·CSV 를 두는 디렉터리(docker-compose.prod.yml 의 DATA_DIR 기본값)
+/data/
+
 # DEM 래스터 (약 48MB)
 *.tif
 *.tiff

@@ -158,6 +158,15 @@ npm run dev                  # /api 는 localhost:8080 으로 프록시. 다른 
 
 DEM 파일과 `.env`는 저장소에 올라가지 않습니다(`.gitignore`).
 
+## 배포
+
+특정 클라우드에 종속되지 않는 Docker 이미지 2개(백엔드, 프론트)와 운영용 compose를 준비해 두었습니다. **실제 배포는 아직 하지 않았고, 배포할 클라우드도 정해지지 않았습니다.**
+
+- 운영용 전체 스택: `docker-compose.prod.yml` (PostGIS + 백엔드 + nginx 프론트). 공개되는 것은 프론트 하나이고 DB는 호스트에 포트를 열지 않습니다. 개발용 `docker-compose.yml`은 DB만 띄우고, `--profile stack`을 주면 전체 스택을 개발 설정으로 띄웁니다.
+- 절차(이미지 빌드, 시크릿 생성, 카카오 설정, 헬스체크, 첫 데이터 채우기, 운영): [`docs/DEPLOY.md`](docs/DEPLOY.md)
+- 환경변수(키 이름·용도·필수 여부, 값 없음): [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md)
+- 운영 프로필(`prod`)은 개발용 기본값(localhost 주소, 짧은 JWT 비밀, 빈 관리 키)이 남아 있으면 기동하지 않습니다. 헬스체크는 `/actuator/health`(DB 연결 포함, 세부 정보 없음)입니다.
+
 ## 테스트와 CI
 
 ```bash
@@ -169,7 +178,7 @@ bash scripts/check-repo-hygiene.sh # 추적 파일에 비밀값·대용량 파�
 
 - 테스트 DB는 **매번 비워지므로** 이름이 `_test`로 끝나지 않으면 테스트가 거부합니다(개발 DB 보호).
 - 백엔드 통합 테스트는 외부 API(T Map, 기상청, 카카오)를 모킹하고 DB는 실제 PostGIS를 씁니다.
-- GitHub Actions(`.github/workflows/ci.yml`): 백엔드(PostGIS 서비스 컨테이너 + JDK 17), 프론트(Node 22: Vitest + 빌드), 저장소 위생 점검을 모든 push와 PR에서 실행합니다.
+- GitHub Actions(`.github/workflows/ci.yml`): 백엔드(PostGIS 서비스 컨테이너 + JDK 17), 프론트(Node 22: Vitest + 빌드), Docker 이미지 빌드와 운영 compose 검증, 저장소 위생 점검을 모든 push와 PR에서 실행합니다.
 
 ## 저장소 구조
 
@@ -177,7 +186,8 @@ bash scripts/check-repo-hygiene.sh # 추적 파일에 비밀값·대용량 파�
 backend/    Spring Boot API (경로 점수 routescore/, 경사 walk/, 수집 ingestion/, 격자 density/, db/migration/)
 frontend/   React + Vite (components/, hooks/, utils/ 순수 함수와 테스트)
 docker/     테스트 DB 초기화 스크립트
-docs/       CHANGELOG.md(단계별 변경 기록), schema-merge.md(스키마 통합 근거)
+docs/       CHANGELOG.md(단계별 변경 기록), DEPLOY.md(배포 가이드), ENVIRONMENT.md(환경변수), schema-merge.md(스키마 통합 근거)
+backend/Dockerfile, frontend/Dockerfile, docker-compose*.yml   배포 산출물
 scripts/    저장소 위생 점검
 ```
 
@@ -188,7 +198,7 @@ scripts/    저장소 위생 점검
 - 안전시설 데이터 소스 6개 중 일부는 수집이 끝나지 않았습니다. 성남시 CCTV(`ODCLOUD_SEONGNAM_CCTV`)는 공공데이터포털에서 해당 데이터셋 활용 신청이 필요하고, 경기도 보안등(`GG_SECURITY_LIGHT`)은 약 30만 건 전체 수집 방식이 개선되지 않았습니다. 보안등이 덜 수집되면 A축 점수가 낮게 나옵니다.
 - 지도 위 마커·오버레이는 자동 테스트 대상이 아닙니다(순수 로직과 화면 문구만 테스트). 카카오 SDK가 필요해 수동 확인이 필요합니다.
 - T Map·기상청 실서버 호출은 자동 테스트에서 검증하지 않습니다(모킹).
-- `docker-compose.yml`은 이 프로젝트 개발 환경(Docker 미설치)에서 직접 실행해 보지 못했습니다.
+- Docker 이미지 빌드와 `docker compose`(개발용·운영용 모두)는 이 프로젝트 개발 환경에 Docker가 없어 직접 실행해 보지 못했습니다. 파일 구조는 자동 테스트가 검사하고, 패키징한 JAR를 환경변수만으로 기동하는 것까지는 확인했습니다. 이미지 빌드는 CI가 처음 실행합니다.
 - 후보 경로 4종은 T Map을 순차 호출하므로 최악의 응답 지연은 호출 수 × 읽기 타임아웃(5초)입니다.
 
 ## 데이터 출처

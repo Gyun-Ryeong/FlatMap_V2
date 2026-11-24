@@ -32,6 +32,9 @@ public class AuthController {
     @Value("${jwt.expiration-ms}")
     private long expirationMs;
 
+    @Value("${app.cookie-secure:false}")
+    private boolean cookieSecure;
+
     @Value("${kakao.rest-api-key}")
     private String kakaoRestApiKey;
 
@@ -60,10 +63,7 @@ public class AuthController {
         try {
             String jwt = authService.loginWithKakao(code);
 
-            Cookie cookie = new Cookie(JwtAuthenticationFilter.COOKIE_NAME, jwt);
-            cookie.setHttpOnly(true);
-            cookie.setPath("/");
-            cookie.setMaxAge((int) (expirationMs / 1000));
+            Cookie cookie = authCookie(jwt, (int) (expirationMs / 1000));
             response.addCookie(cookie);
 
             return ResponseEntity.status(HttpStatus.FOUND)
@@ -95,11 +95,18 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletResponse response) {
-        Cookie cookie = new Cookie(JwtAuthenticationFilter.COOKIE_NAME, "");
-        cookie.setHttpOnly(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(0);
-        response.addCookie(cookie);
+        response.addCookie(authCookie("", 0));
         return ResponseEntity.noContent().build();
+    }
+
+    /** 로그인 쿠키: HttpOnly, SameSite=Lax, 운영(HTTPS)에서는 Secure. 발급과 삭제가 같은 속성을 쓴다. */
+    private Cookie authCookie(String value, int maxAgeSeconds) {
+        Cookie cookie = new Cookie(JwtAuthenticationFilter.COOKIE_NAME, value);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(cookieSecure);
+        cookie.setPath("/");
+        cookie.setMaxAge(maxAgeSeconds);
+        cookie.setAttribute("SameSite", "Lax");
+        return cookie;
     }
 }

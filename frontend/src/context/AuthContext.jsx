@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import axiosInstance from '../api/axiosInstance';
+import { buildLoginUrl } from '../utils/authUrl';
 
 const AuthContext = createContext(null);
 
@@ -23,9 +24,8 @@ export function AuthProvider({ children }) {
   }, [refreshUser]);
 
   const login = () => {
-    // 전체 페이지 이동은 CRA 개발서버 프록시를 타지 않으므로 백엔드 절대 주소로 직접 이동
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
-    window.location.href = `${backendUrl}/api/auth/kakao/login`;
+    // 전체 페이지 이동은 axios 를 타지 않는다. 기본은 같은 출처(/api, 운영 nginx·개발 프록시), 필요할 때만 VITE_BACKEND_URL.
+    window.location.href = buildLoginUrl(import.meta.env.VITE_BACKEND_URL);
   };
 
   const logout = async () => {
