@@ -3,7 +3,7 @@ package com.flatmap.navigation.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flatmap.navigation.config.ApiKeyConfig;
-import com.flatmap.navigation.entity.SteepSlopeArea;
+import com.flatmap.navigation.model.SteepSlopeArea;
 import com.flatmap.navigation.repository.SteepSlopeAreaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,7 +116,7 @@ public class CsvImportService {
         }
 
         if (!toSave.isEmpty()) {
-            repository.saveAll(toSave);
+            repository.insertAll(toSave);
             log.info("DB 저장 완료: {}건", toSave.size());
         }
 

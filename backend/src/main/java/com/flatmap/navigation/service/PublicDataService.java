@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flatmap.navigation.config.ApiKeyConfig;
 import com.flatmap.navigation.entity.*;
+import com.flatmap.navigation.model.SteepSlopeArea;
 import com.flatmap.navigation.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,10 +77,8 @@ public class PublicDataService {
 
         if (!allAreas.isEmpty()) {
             long deleted = steepSlopeAreaRepository.countBySource("PUBLIC_DATA");
-            steepSlopeAreaRepository.deleteAll(steepSlopeAreaRepository.findBySource("PUBLIC_DATA"));
-            log.info("기존 PUBLIC_DATA 데이터 {}건 삭제", deleted);
-            steepSlopeAreaRepository.saveAll(allAreas);
-            log.info("PUBLIC_DATA 데이터 {}건 저장 완료", allAreas.size());
+            steepSlopeAreaRepository.replaceSource("PUBLIC_DATA", allAreas);
+            log.info("기존 PUBLIC_DATA 데이터 {}건 삭제 후 {}건 저장 완료", deleted, allAreas.size());
         } else {
             log.info("공공데이터포털에서 수집된 성남시 급경사지 데이터 없음");
         }

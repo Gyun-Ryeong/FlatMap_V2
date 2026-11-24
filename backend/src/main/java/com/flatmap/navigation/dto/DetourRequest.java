@@ -26,15 +26,12 @@ public class DetourRequest {
     public static class RiskCoord {
         private double lat;
         private double lng;
-        private String riskLevel;
         private int nearestRouteIdx;
 
         public double getLat() { return lat; }
         public void setLat(double lat) { this.lat = lat; }
         public double getLng() { return lng; }
         public void setLng(double lng) { this.lng = lng; }
-        public String getRiskLevel() { return riskLevel; }
-        public void setRiskLevel(String riskLevel) { this.riskLevel = riskLevel; }
         public int getNearestRouteIdx() { return nearestRouteIdx; }
         public void setNearestRouteIdx(int nearestRouteIdx) { this.nearestRouteIdx = nearestRouteIdx; }
     }

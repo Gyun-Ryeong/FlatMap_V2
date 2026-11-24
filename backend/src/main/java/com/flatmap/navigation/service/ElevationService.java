@@ -2,7 +2,7 @@ package com.flatmap.navigation.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.flatmap.navigation.entity.SteepSlopeArea;
+import com.flatmap.navigation.model.SteepSlopeArea;
 import com.flatmap.navigation.repository.SteepSlopeAreaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +50,7 @@ public class ElevationService {
         log.info("elevations.json 로드: {}건 (유효 고도값 {}건)", root.size(), angleMap.size());
 
         List<SteepSlopeArea> areas = repository.findAll();
-        int updated = 0;
+        Map<Long, Double> gradesToWrite = new HashMap<>();
         int skipped = 0;
 
         for (SteepSlopeArea area : areas) {
@@ -62,11 +62,10 @@ public class ElevationService {
             }
 
             // 붕괴위험 지정지에는 보행 위험등급을 부여하지 않는다. 경사도(°)만 갱신한다.
-            area.setGrade(angleDeg);
-            updated++;
+            gradesToWrite.put(area.getId(), angleDeg);
         }
 
-        repository.saveAll(areas);
+        int updated = repository.updateGrades(gradesToWrite);
         log.info("Copernicus DEM 기반 업데이트 완료 — 업데이트: {}, 스킵: {}", updated, skipped);
         return Map.of("total", areas.size(), "updated", updated, "skipped", skipped,
                 "message", "Copernicus DEM (30m) 기반 경사도 업데이트 완료");

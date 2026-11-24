@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flatmap.navigation.config.ApiKeyConfig;
 import com.flatmap.navigation.entity.AccidentZone;
 import com.flatmap.navigation.entity.SeniorCenter;
-import com.flatmap.navigation.entity.SteepSlopeArea;
+import com.flatmap.navigation.model.SteepSlopeArea;
 import com.flatmap.navigation.repository.AccidentZoneRepository;
 import com.flatmap.navigation.repository.SeniorCenterRepository;
 import com.flatmap.navigation.repository.SteepSlopeAreaRepository;
@@ -120,8 +120,7 @@ public class GyeonggiDataService {
         }
 
         if (!allAreas.isEmpty()) {
-            steepSlopeAreaRepository.deleteAll(steepSlopeAreaRepository.findBySource("GYEONGGI"));
-            steepSlopeAreaRepository.saveAll(allAreas);
+            steepSlopeAreaRepository.replaceSource("GYEONGGI", allAreas);
             log.info("GYEONGGI 오르막차로 {}건 저장", allAreas.size());
         }
         return allAreas.size();

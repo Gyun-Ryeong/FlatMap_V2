@@ -1,7 +1,7 @@
 package com.flatmap.navigation.controller;
 
 import com.flatmap.navigation.config.ApiErrors;
-import com.flatmap.navigation.entity.SteepSlopeArea;
+import com.flatmap.navigation.model.SteepSlopeArea;
 import com.flatmap.navigation.repository.SteepSlopeAreaRepository;
 import com.flatmap.navigation.service.CsvImportService;
 import com.flatmap.navigation.service.DisasterDataService;
@@ -204,19 +204,17 @@ public class SteepSlopeDataController {
         int cleared = 0;
 
         for (var it : req.getItems()) {
-            var found = repository.findById(it.getId());
-            if (found.isEmpty()) { problems.add("대상 없음: id=" + it.getId()); continue; }
-            SteepSlopeArea e = found.get();
-            e.setGrade(it.getGrade());
-            repository.save(e);
+            if (!repository.updateGrade(it.getId(), it.getGrade())) {
+                problems.add("대상 없음: id=" + it.getId());
+                continue;
+            }
             if (it.getGrade() == null) cleared++; else updated++;
         }
 
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("updated", updated);
         result.put("cleared", cleared);
-        result.put("gradeFilled", repository.findAll().stream()
-                .filter(a -> a.getGrade() != null).count());
+        result.put("gradeFilled", repository.countWithGrade());
         result.put("total", repository.count());
         result.put("moisCsvTotal", repository.countBySource("MOIS_CSV"));
         if (!problems.isEmpty()) result.put("problems", problems);
@@ -262,7 +260,7 @@ public class SteepSlopeDataController {
                 problems.add("MOIS_CSV 아님 — 삭제 거부: id=" + id + " source=" + found.get().getSource());
                 continue;
             }
-            repository.delete(found.get());
+            repository.deleteById(id);
             deleted++;
         }
 
@@ -276,15 +274,16 @@ public class SteepSlopeDataController {
                 problems.add("MOIS_CSV 아님 — 갱신 거부: id=" + it.getId() + " source=" + e.getSource());
                 continue;
             }
-            e.setName(it.getName());
-            e.setSigungu(it.getSigungu());
-            e.setEupmyeon(it.getEupmyeon());
-            e.setJibun(it.getJibun());
-            e.setRegionCode(it.getRegionCode());
-            e.setLatitude(it.getLatitude());
-            e.setLongitude(it.getLongitude());
-            if (it.getIsMountain() != null) e.setIsMountain(it.getIsMountain());
-            repository.save(e);
+            SteepSlopeArea next = new SteepSlopeArea();
+            next.setName(it.getName());
+            next.setSigungu(it.getSigungu());
+            next.setEupmyeon(it.getEupmyeon());
+            next.setJibun(it.getJibun());
+            next.setRegionCode(it.getRegionCode());
+            next.setLatitude(it.getLatitude());
+            next.setLongitude(it.getLongitude());
+            next.setIsMountain(it.getIsMountain());   // null 이면 기존 값 유지
+            repository.updateDescriptive(it.getId(), next);
             updated++;
         }
 
@@ -303,7 +302,7 @@ public class SteepSlopeDataController {
             e.setSource("MOIS_CSV");
             toInsert.add(e);
         }
-        repository.saveAll(toInsert);
+        repository.insertAll(toInsert);
 
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("deleted", deleted);

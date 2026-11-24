@@ -3,7 +3,7 @@ package com.flatmap.navigation.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flatmap.navigation.config.ApiKeyConfig;
-import com.flatmap.navigation.entity.SteepSlopeArea;
+import com.flatmap.navigation.model.SteepSlopeArea;
 import com.flatmap.navigation.repository.SteepSlopeAreaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,10 +66,8 @@ public class DisasterDataService {
         // 기존 DISASTER 소스 데이터 삭제 후 새로 저장
         if (!allAreas.isEmpty()) {
             long deleted = steepSlopeAreaRepository.countBySource("DISASTER");
-            steepSlopeAreaRepository.deleteAll(steepSlopeAreaRepository.findBySource("DISASTER"));
-            log.info("기존 DISASTER 데이터 {}건 삭제", deleted);
-            steepSlopeAreaRepository.saveAll(allAreas);
-            log.info("DISASTER 데이터 {}건 저장 완료", allAreas.size());
+            steepSlopeAreaRepository.replaceSource("DISASTER", allAreas);
+            log.info("기존 DISASTER 데이터 {}건 삭제 후 {}건 저장 완료", deleted, allAreas.size());
         }
 
         return allAreas.size();

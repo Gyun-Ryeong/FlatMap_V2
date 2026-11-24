@@ -4,6 +4,7 @@ import com.flatmap.navigation.support.IntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
@@ -72,17 +73,22 @@ class FlywayMigrationTest {
     }
 
     @Test
-    void steepSlopeGeomIsDerivedFromLatLngAndGradeIsDegrees() {
-        jdbc.update("INSERT INTO steep_slope_areas (name, latitude, longitude, grade, source) " +
-                "VALUES ('t', 37.40, 127.12, 12.5, 'TEST')");
+    void steepSlopeLatLngAreDerivedFromGeomAndGradeIsDegrees() {
+        // geom 이 쓰기 원본이고 latitude/longitude 는 거기서 파생된 읽기 전용 컬럼이다(V3).
+        jdbc.update("INSERT INTO steep_slope_areas (name, grade, source, geom) " +
+                "VALUES ('t', 12.5, 'TEST', ST_SetSRID(ST_MakePoint(127.12, 37.40), 4326))");
         try {
-            Double lat = jdbc.queryForObject("SELECT ST_Y(geom) FROM steep_slope_areas WHERE name='t'", Double.class);
-            Double lng = jdbc.queryForObject("SELECT ST_X(geom) FROM steep_slope_areas WHERE name='t'", Double.class);
+            Double lat = jdbc.queryForObject("SELECT latitude FROM steep_slope_areas WHERE name='t'", Double.class);
+            Double lng = jdbc.queryForObject("SELECT longitude FROM steep_slope_areas WHERE name='t'", Double.class);
             assertThat(lat).isEqualTo(37.40);
             assertThat(lng).isEqualTo(127.12);
+            // latitude/longitude 는 생성 컬럼이라 직접 쓸 수 없다.
+            assertThatThrownBy(() -> jdbc.update("INSERT INTO steep_slope_areas (name, latitude, longitude) " +
+                    "VALUES ('direct', 37.40, 127.12)")).isInstanceOf(BadSqlGrammarException.class);
             // 단위는 각도(°). 90 이상은 %를 넣은 실수로 보고 거부한다.
-            assertThatThrownBy(() -> jdbc.update("INSERT INTO steep_slope_areas (name, latitude, longitude, grade) " +
-                    "VALUES ('bad', 37.40, 127.12, 95)")).isInstanceOf(DataIntegrityViolationException.class);
+            assertThatThrownBy(() -> jdbc.update("INSERT INTO steep_slope_areas (name, grade, geom) " +
+                    "VALUES ('bad', 95, ST_SetSRID(ST_MakePoint(127.12, 37.40), 4326))"))
+                    .isInstanceOf(DataIntegrityViolationException.class);
         } finally {
             jdbc.update("DELETE FROM steep_slope_areas");
         }

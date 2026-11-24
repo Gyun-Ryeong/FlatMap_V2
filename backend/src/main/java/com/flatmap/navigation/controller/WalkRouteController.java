@@ -56,12 +56,11 @@ public class WalkRouteController {
             WeatherInfo weather = weatherService.getWeather(midPoint.getLat(), midPoint.getLng());
             response.setWeather(weather);
 
-            // 3. 날씨 기반 위험도 보정
-            steepSlopeService.adjustRiskByWeather(riskSections, weather);
+            // 3. 붕괴위험 경고 레이어(등급 없음). 날씨는 별도 필드로 함께 내려주며 급경사지 구간을 바꾸지 않는다.
             response.setRiskSections(riskSections);
 
             if (!riskSections.isEmpty()) {
-                log.info("경로에서 위험구간 {}건 감지 (날씨 보정 적용)", riskSections.size());
+                log.info("경로에서 붕괴위험 지정지 {}건 감지", riskSections.size());
             }
 
             return ResponseEntity.ok(response);
@@ -92,7 +91,7 @@ public class WalkRouteController {
             // 3. avoidPoints → RiskSection 변환 후 passList 생성
             List<RiskSection> fakeRisks = request.getAvoidPoints().stream()
                     .map(ap -> new RiskSection(ap.getLat(), ap.getLng(), "avoid",
-                            0, ap.getRiskLevel(), 0, ap.getNearestRouteIdx()))
+                            null, null, 0, ap.getNearestRouteIdx()))
                     .collect(Collectors.toList());
 
             String passList = detourService.generatePassList(fakeRisks, originalRoute.getCoords());
@@ -122,12 +121,11 @@ public class WalkRouteController {
                         "더 안전한 우회 경로를 찾지 못해 원래 경로를 반환했습니다."));
             }
 
-            // 7. 날씨 조회 + 보정
+            // 7. 날씨 조회
             List<RouteResponse.Coord> coords = detourResponse.getCoords();
             RouteResponse.Coord midPoint = coords.get(coords.size() / 2);
             WeatherInfo weather = weatherService.getWeather(midPoint.getLat(), midPoint.getLng());
             detourResponse.setWeather(weather);
-            steepSlopeService.adjustRiskByWeather(detourRisks, weather);
             detourResponse.setRiskSections(detourRisks);
             detourResponse.setDetourApplied(true);
 
@@ -152,7 +150,6 @@ public class WalkRouteController {
         RouteResponse.Coord midPoint = coords.get(coords.size() / 2);
         WeatherInfo weather = weatherService.getWeather(midPoint.getLat(), midPoint.getLng());
         originalRoute.setWeather(weather);
-        steepSlopeService.adjustRiskByWeather(originalRisks, weather);
         originalRoute.setRiskSections(originalRisks);
         originalRoute.setDetourApplied(false);
         originalRoute.setDetourMessage(message);

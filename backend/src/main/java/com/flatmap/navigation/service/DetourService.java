@@ -2,7 +2,6 @@ package com.flatmap.navigation.service;
 
 import com.flatmap.navigation.dto.RiskSection;
 import com.flatmap.navigation.dto.RouteResponse;
-import com.flatmap.navigation.entity.SteepSlopeArea;
 import com.flatmap.navigation.util.GeoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class DetourService {
@@ -49,17 +49,14 @@ public class DetourService {
         if (riskSections == null || riskSections.isEmpty()) return null;
         if (routeCoords == null || routeCoords.size() < 2) return null;
 
-        List<SteepSlopeArea> allAreas = steepSlopeService.getAllAreasWithCoords();
-
         // 1단계: 인접 위험구간 군집화
         List<List<RiskSection>> clusters = clusterRiskSections(riskSections);
         log.info("위험구간 {}건 → {}개 군집으로 통합", riskSections.size(), clusters.size());
 
-        // 2단계: 군집을 위험도 높은 순으로 정렬해 상위 MAX_WAYPOINTS개만 사용, 이후 경로 순서로 재정렬
+        // 2단계: 급경사지에는 등급이 없으므로 우선순위를 매기지 않는다. 경로 순서대로 앞의 MAX_WAYPOINTS개 군집만 쓴다.
         List<List<RiskSection>> topClusters = clusters.stream()
-                .sorted(Comparator.comparingInt(this::clusterRiskRank))
-                .limit(MAX_WAYPOINTS)
                 .sorted(Comparator.comparingInt(this::clusterRouteIdx))
+                .limit(MAX_WAYPOINTS)
                 .collect(java.util.stream.Collectors.toList());
 
         StringBuilder passList = new StringBuilder();
@@ -69,7 +66,7 @@ public class DetourService {
             double[] centroid = centroidOf(cluster);
             int anchorIdx = nearestRouteIdx(routeCoords, centroid[0], centroid[1]);
 
-            double[] waypoint = findSafeWaypoint(routeCoords, anchorIdx, centroid[0], centroid[1], allAreas);
+            double[] waypoint = findSafeWaypoint(routeCoords, anchorIdx, centroid[0], centroid[1]);
 
             if (waypoint == null) {
                 log.info("군집({}건, 중심 {},{}) — 안전한 경유지를 찾지 못해 건너뜀",
@@ -139,25 +136,6 @@ public class DetourService {
         return new double[]{sumLat / cluster.size(), sumLng / cluster.size()};
     }
 
-    /** 군집의 대표 위험도 순위 (구성원 중 가장 높은 위험도 기준, 낮을수록 위험) */
-    private int clusterRiskRank(List<RiskSection> cluster) {
-        int best = Integer.MAX_VALUE;
-        for (RiskSection rs : cluster) {
-            best = Math.min(best, riskRank(rs.getRiskLevel()));
-        }
-        return best;
-    }
-
-    private int riskRank(String riskLevel) {
-        if (riskLevel == null) return 3;
-        switch (riskLevel) {
-            case "VERY_HIGH": return 0;
-            case "HIGH": return 1;
-            case "MEDIUM": return 2;
-            default: return 3;
-        }
-    }
-
     /** 군집이 경로상 어디쯤인지 (구성원 nearestRouteIdx의 최솟값) */
     private int clusterRouteIdx(List<RiskSection> cluster) {
         int min = Integer.MAX_VALUE;
@@ -190,8 +168,7 @@ public class DetourService {
      * @return [lat, lng] 또는 안전한 지점을 찾지 못하면 null
      */
     private double[] findSafeWaypoint(List<RouteResponse.Coord> coords, int idx,
-                                      double hazardLat, double hazardLng,
-                                      List<SteepSlopeArea> allAreas) {
+                                      double hazardLat, double hazardLng) {
         for (double offset : OFFSET_STEPS_METERS) {
             double[][] candidates = calculateCandidates(coords, idx, offset);
             if (candidates == null) return null;
@@ -199,9 +176,12 @@ public class DetourService {
             double[] best = null;
             double bestHazardDist = -1;
 
-            for (double[] cand : candidates) {
-                double clearance = minDistanceToArea(cand[0], cand[1], allAreas);
-                if (clearance < SteepSlopeService.RISK_RADIUS_METERS) continue;
+            // 두 후보가 다른 급경사지 반경(RISK_RADIUS_METERS)에 걸리는지 DB 에서 한 번에 판정한다(ST_DWithin).
+            Set<Integer> blocked = steepSlopeService.pointsWithinRiskRadius(List.of(candidates));
+
+            for (int c = 0; c < candidates.length; c++) {
+                if (blocked.contains(c)) continue;
+                double[] cand = candidates[c];
 
                 double hazardDist = GeoUtils.haversineMeters(cand[0], cand[1], hazardLat, hazardLng);
                 if (hazardDist > bestHazardDist) {
@@ -268,15 +248,5 @@ public class DetourService {
                 {center.getLat() + offsetLat, center.getLng() + offsetLng},   // 시계방향
                 {center.getLat() - offsetLat, center.getLng() - offsetLng}    // 반시계방향
         };
-    }
-
-    /** 지정 좌표에서 가장 가까운 급경사지까지의 거리(m). 데이터가 없으면 Double.MAX_VALUE */
-    private double minDistanceToArea(double lat, double lng, List<SteepSlopeArea> areas) {
-        double min = Double.MAX_VALUE;
-        for (SteepSlopeArea area : areas) {
-            double d = GeoUtils.haversineMeters(lat, lng, area.getLatitude(), area.getLongitude());
-            if (d < min) min = d;
-        }
-        return min;
     }
 }
