@@ -100,8 +100,8 @@ class FlywayMigrationTest {
         assertThat(cols).contains("density_level", "density_score", "facility_count", "grid_polygon");
         assertThat(cols).doesNotContain("risk_level", "safety_score");
 
-        String insert = "INSERT INTO facility_density_grid (grid_i, grid_j, grid_polygon, facility_count, density_score, density_level) " +
-                "VALUES (?, ?, ST_MakeEnvelope(127.04, 37.33, 127.0434, 37.3327, 4326), 3, 47, ?)";
+        String insert = "INSERT INTO facility_density_grid (grid_i, grid_j, grid_polygon, facility_count, cctv_count, density_score, density_level) " +
+                "VALUES (?, ?, ST_MakeEnvelope(127.04, 37.33, 127.0434, 37.3327, 4326), 3, 3, 47, ?)";
         try {
             int i = 0;
             for (String level : List.of("LOW_DENSITY", "MEDIUM", "HIGH_DENSITY")) {
