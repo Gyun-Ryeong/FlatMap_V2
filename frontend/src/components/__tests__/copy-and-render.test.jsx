@@ -110,9 +110,10 @@ describe('경로 카드·상세 렌더', () => {
 });
 
 describe('문구 규칙 (미구현 기능을 있는 것처럼 쓰지 않는다)', () => {
-  it('홈 화면: 구현된 기능만, RAG 는 개발 중으로 표시(보행난이도는 구현됨), 이름은 [이름 미정]', () => {
+  it('홈 화면: 구현된 기능만, RAG 는 개발 중으로 표시(보행난이도는 구현됨), 이름은 FlatMap', () => {
     const html = renderToStaticMarkup(<HomeScreen onStart={() => {}} />);
-    expect(html).toContain('[이름 미정]');
+    expect(html).toContain('FlatMap');
+    expect(html).not.toContain('[이름 미정]');
     expect(html).toContain('개발 중(아직 제공하지 않음): RAG 기반 안내');
     expect(html).not.toMatch(/개발 중[^<]*보행난이도|개발 중[^<]*보행약자/);
     expect(html).toContain('설계 파라미터');

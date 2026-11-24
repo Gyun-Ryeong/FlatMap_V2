@@ -116,12 +116,6 @@ public class SafetyFacilityRepository {
                 rowMapper, args.toArray());
     }
 
-    public long countByDataSource(String dataSource) {
-        Long n = jdbc.queryForObject("SELECT COUNT(*) FROM safety_facility WHERE data_source = ?",
-                Long.class, dataSource);
-        return n == null ? 0 : n;
-    }
-
     /**
      * 한 출처(data_source)의 전체 행 수와 "나쁜 값" 행 수 — {전체, 나쁜 행}.
      * 나쁜 값 기준은 TextQuality 와 같다: NULL/공백/'?'만/U+FFFD 포함. checkAddress 가 false 면 name 만 본다.

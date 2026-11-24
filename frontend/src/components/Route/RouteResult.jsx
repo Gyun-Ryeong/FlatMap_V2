@@ -37,8 +37,8 @@ export default function RouteResult({ routes, selectedRouteId, onSelectRoute, re
   if (!routes.length) return null;
 
   return (
-    <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(200,210,224,0.4)' }}>
-      <div style={{ fontSize: 15, fontWeight: 800, color: '#3f4550', marginBottom: 9 }}>
+    <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(203, 210, 219,0.4)' }}>
+      <div style={{ fontSize: 15, fontWeight: 800, color: '#41454c', marginBottom: 9 }}>
         비교할 경로를 선택하세요
       </div>
 
@@ -70,10 +70,10 @@ export default function RouteResult({ routes, selectedRouteId, onSelectRoute, re
                 minHeight: 88,
                 padding: '12px',
                 borderRadius: 11,
-                border: `2px solid ${selected ? level.border : '#dfe2e7'}`,
+                border: `2px solid ${selected ? level.border : '#e0e2e5'}`,
                 background: selected ? level.bg : 'white',
                 cursor: 'pointer',
-                boxShadow: selected ? `0 2px 10px ${level.color}1a` : '0 1px 3px rgba(0,0,0,0.04)',
+                boxShadow: selected ? `0 2px 10px ${level.color}1a` : '0 1px 3px rgba(0, 0, 0,0.04)',
                 position: 'relative',
                 overflow: 'hidden',
                 transition: 'all 0.12s',
@@ -85,15 +85,15 @@ export default function RouteResult({ routes, selectedRouteId, onSelectRoute, re
 
               <div style={{ paddingLeft: selected ? 4 : 0, flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: '#20232b' }}>{route.searchOption}</span>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: '#212328' }}>{route.searchOption}</span>
                   {route.recommended && (
-                    <span style={{ fontSize: 11, padding: '3px 7px', borderRadius: 99, background: '#e0ebf7', color: '#27456f', fontWeight: 800 }}>
+                    <span style={{ fontSize: 11, padding: '3px 7px', borderRadius: 99, background: '#e3ebf2', color: '#334563', fontWeight: 800 }}>
                       점수 최고
                     </span>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 10, fontSize: 13, color: '#666d78' }}>
-                  <span style={{ fontWeight: 800, color: '#2a2d38', fontSize: 15 }}>{min}분</span>
+                <div style={{ display: 'flex', gap: 10, fontSize: 13, color: '#686d74' }}>
+                  <span style={{ fontWeight: 800, color: '#2b2d35', fontSize: 15 }}>{min}분</span>
                   <span>{km}km</span>
                 </div>
                 <div
@@ -105,7 +105,7 @@ export default function RouteResult({ routes, selectedRouteId, onSelectRoute, re
                   <span style={{ color: '#9a5656' }}>경찰시설 {route.policeCount}개</span>
                 </div>
                 {hasScore && (
-                  <div style={{ height: 3.5, background: '#edeef1', borderRadius: 2, overflow: 'hidden', marginTop: 5 }}>
+                  <div style={{ height: 3.5, background: '#edeef0', borderRadius: 2, overflow: 'hidden', marginTop: 5 }}>
                     <div style={{ height: '100%', width: `${route.totalScore}%`, background: level.color, borderRadius: 2, opacity: 0.6 }} />
                   </div>
                 )}

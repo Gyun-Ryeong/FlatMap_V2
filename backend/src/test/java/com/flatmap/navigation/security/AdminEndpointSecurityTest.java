@@ -56,6 +56,7 @@ class AdminEndpointSecurityTest {
                 Arguments.of(HttpMethod.POST, "/api/steep-slope/update-grade/elevation"),
                 Arguments.of(HttpMethod.POST, "/api/steep-slope/update-grade/values"),
                 Arguments.of(HttpMethod.POST, "/api/steep-slope/import/csv"),
+                Arguments.of(HttpMethod.POST, "/api/steep-slope/import/seongnam-grades"),
                 Arguments.of(HttpMethod.POST, "/api/steep-slope/sync"),
                 Arguments.of(HttpMethod.POST, "/api/density-grid/recalculate"),
                 Arguments.of(HttpMethod.POST, "/api/walk-difficulty/grid/rebuild"));
