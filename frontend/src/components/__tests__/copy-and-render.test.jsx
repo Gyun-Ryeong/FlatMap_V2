@@ -9,6 +9,7 @@ import LayerPanel from '../Panel/LayerPanel';
 import { SteepSlopeListBody } from '../Panel/SteepSlopeList';
 import HomeScreen from '../Home/HomeScreen';
 import PlaceShortcuts from '../Panel/PlaceShortcuts';
+import RagEntry, { RagAskView, RagEntryView } from '../Panel/RagEntry';
 
 const route = {
   routeId: 'r1',
@@ -237,6 +238,48 @@ describe('문구 규칙 (미구현 기능을 있는 것처럼 쓰지 않는다)'
     );
     expect(failed).toContain('불러오지 못했습니다');
     expect(failed).not.toContain('조건에 맞는 데이터가 없습니다');
+  });
+
+  it('RAG 진입점: 기본(상태를 모름)·꺼짐·켜짐+미연결에서는 아무것도 렌더하지 않는다(RAG 는 개발 중)', () => {
+    const noop = () => {};
+    // 컨테이너는 서버 상태 응답 전에는 숨김 상태다(서버가 꺼 두면 404 라 계속 숨김)
+    expect(renderToStaticMarkup(<RagEntry />)).toBe('');
+    for (const status of [null, undefined, {}, { enabled: false, connected: false }, { enabled: true, connected: false }]) {
+      expect(renderToStaticMarkup(<RagEntryView status={status} open onToggle={noop}>패널</RagEntryView>)).toBe('');
+    }
+  });
+
+  it('RAG 진입점: 켜짐+연결됨이면 그려지고, 열렸을 때만 패널이 보인다', () => {
+    const status = { enabled: true, connected: true };
+    const closed = renderToStaticMarkup(<RagEntryView status={status} open={false} onToggle={() => {}}>패널본문</RagEntryView>);
+    expect(closed).toContain('질문하기');
+    expect(closed).not.toContain('패널본문');
+    const open = renderToStaticMarkup(<RagEntryView status={status} open onToggle={() => {}}>패널본문</RagEntryView>);
+    expect(open).toContain('패널본문');
+  });
+
+  it('RAG 질문 화면: 입력 상한과 답변·출처 표시, 오류는 그대로 안내', () => {
+    const html = renderToStaticMarkup(
+      <RagAskView value="질문" onChange={() => {}} onSubmit={() => {}} loading={false}
+        error={null} result={{ answer: '답변 본문', sources: ['출처 A', '출처 B'] }} />
+    );
+    expect(html).toContain('maxLength="500"');
+    expect(html).toContain('답변 본문');
+    expect(html).toContain('출처 A');
+    const err = renderToStaticMarkup(
+      <RagAskView value="" onChange={() => {}} onSubmit={() => {}} loading error="질문하려면 로그인해 주세요." result={null} />
+    );
+    expect(err).toContain('질문하려면 로그인해 주세요.');
+    expect(err).toContain('답변을 찾는 중');
+    expect(err).toContain('disabled');
+  });
+
+  it('홈 화면: RAG 는 개발 중으로만 적는다(기능으로 설명하지 않는다)', () => {
+    const html = renderToStaticMarkup(<HomeScreen onStart={() => {}} />);
+    const mentions = html.match(/[^<>]*RAG[^<>]*/g) ?? [];
+    expect(mentions).toHaveLength(1);
+    expect(mentions[0]).toContain('개발 중');
+    expect(mentions[0]).toContain('아직 제공하지 않음');
   });
 
   it('즐겨찾기: 로그인 전에는 로그인 안내', () => {

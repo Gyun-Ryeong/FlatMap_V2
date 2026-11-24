@@ -68,6 +68,12 @@
 | `SEONGNAM_SECURITY_LIGHT_CSV_PATH` | 성남시 보안등 CSV(CP949) 경로 | 기능 필수 | 슬래시(`/`)로 적는다. 운영 compose 는 `/data/seongnam_security_light.csv` 로 고정한다 |
 | `DATA_DIR` | 운영 compose 가 `/data` 로 마운트하는 호스트 디렉터리 | 선택 | 기본 `./data`. DEM·CSV 를 둔다(이미지에 넣지 않는다) |
 
+## RAG 연동 지점 (개발 중)
+
+| 키 | 용도 | 필수 | 비고 |
+|---|---|---|---|
+| `RAG_ENABLED` | RAG 연동 지점(`/api/rag/*`)을 켠다 | 선택 | 기본 `false`(빈 값도 꺼짐). **RAG 는 개발 중이며 이 저장소에 RAG 서버·구현체가 없다.** 켜도 "미연결" 상태이고 화면에 질문 진입점은 나오지 않는다 |
+
 ## 프론트엔드 (`frontend/.env`, Vite — `VITE_` 접두사만 브라우저에 노출됨)
 
 | 키 | 용도 | 필수 | 비고 |
