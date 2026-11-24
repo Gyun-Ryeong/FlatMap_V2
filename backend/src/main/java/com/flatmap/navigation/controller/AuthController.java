@@ -1,7 +1,6 @@
 package com.flatmap.navigation.controller;
 
 import com.flatmap.navigation.config.JwtAuthenticationFilter;
-import com.flatmap.navigation.entity.User;
 import com.flatmap.navigation.repository.UserRepository;
 import com.flatmap.navigation.service.AuthService;
 import jakarta.servlet.http.Cookie;
