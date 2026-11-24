@@ -25,10 +25,11 @@ describe('우회 요청', () => {
   });
 
   it('요청 본문: 좌표·옵션·회피 지점(등급 필드 없음)', () => {
-    const body = buildDetourRequest(route, { lat: 37.4, lng: 127.1 }, { lat: 37.45, lng: 127.15 });
+    const body = buildDetourRequest(route, { lat: 37.4, lng: 127.1 }, { lat: 37.45, lng: 127.15 }, 'WEAK');
     expect(body).toEqual({
       originLat: 37.4, originLng: 127.1, destLat: 37.45, destLng: 127.15,
       option: 'MAIN_ROAD',
+      walkMode: 'WEAK',
       avoidPoints: [
         { lat: 37.41, lng: 127.12, nearestRouteIdx: 12 },
         { lat: 37.42, lng: 127.13, nearestRouteIdx: 40 },

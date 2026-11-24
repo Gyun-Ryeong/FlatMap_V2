@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import RouteResult from '../Route/RouteResult';
+import RouteResult, { Breakdown } from '../Route/RouteResult';
 import RouteDetail from '../Route/RouteDetail';
 import WeatherCard from '../Weather/WeatherCard';
 import ScoreGuide from '../Panel/ScoreGuide';
@@ -94,24 +94,55 @@ describe('경로 카드·상세 렌더', () => {
 });
 
 describe('문구 규칙 (미구현 기능을 있는 것처럼 쓰지 않는다)', () => {
-  it('홈 화면: 구현된 기능만, RAG·보행난이도는 개발 중으로 표시, 이름은 [이름 미정]', () => {
+  it('홈 화면: 구현된 기능만, RAG 는 개발 중으로 표시(보행난이도는 구현됨), 이름은 [이름 미정]', () => {
     const html = renderToStaticMarkup(<HomeScreen onStart={() => {}} />);
     expect(html).toContain('[이름 미정]');
-    expect(html).toContain('개발 중(아직 제공하지 않음)');
+    expect(html).toContain('개발 중(아직 제공하지 않음): RAG 기반 안내');
+    expect(html).not.toMatch(/개발 중[^<]*보행난이도|개발 중[^<]*보행약자/);
     expect(html).toContain('설계 파라미터');
     expect(html).not.toMatch(/엘리베이터|화장실|쉼터|야간 사고|사고 이력|걷는 속도|계단/);
     expect(html).not.toMatch(/안전점수|위험구역|SafeRoute/);
   });
 
-  it('보행약자/일반 선택은 비활성이고 준비 중으로 표시된다', () => {
-    const html = renderToStaticMarkup(<RouteOptions priority="safety" onChangePriority={() => {}} />);
-    expect(html).toContain('준비 중');
+  it('보행약자/일반 선택: 활성이고 선택 상태가 표시되며 한계를 밝힌다', () => {
+    const html = renderToStaticMarkup(
+      <RouteOptions priority="safety" onChangePriority={() => {}} walkMode="WEAK" onChangeWalkMode={() => {}} />
+    );
     expect(html).toContain('보행약자');
+    expect(html).toContain('일반');
     expect(html).not.toContain('교통약자');
-    expect(html.match(/disabled/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(html).not.toContain('준비 중');
+    expect(html).not.toContain('disabled');
+    expect(html).toContain('✓ 보행약자');
+    expect(html).not.toContain('✓ 일반');
+    expect(html).toContain('실제보다 낮게 나오는 경향');
     expect(html).toContain('안전 우선');
     expect(html).toContain('균형');
     expect(html).toContain('빠른 길');
+  });
+
+  it('점수 내역: 보행난이도(B축)는 구간 비율·기준 각도·평균/최대 경사를 보여 준다', () => {
+    const html = renderToStaticMarkup(
+      <Breakdown
+        breakdown={[
+          { axis: 'A', name: '야간 시설 노출', score: 64, weight: 1, detail: {} },
+          {
+            axis: 'B', name: '보행난이도', score: 68.8, weight: 1,
+            detail: {
+              mode: 'WEAK', goodMaxDeg: 3.18, cautionMaxDeg: 4.76,
+              goodPercent: 50, cautionPercent: 37.5, dangerPercent: 12.5, meanSlopeDeg: 3.9, maxSlopeDeg: 9,
+            },
+          },
+        ]}
+      />
+    );
+    expect(html).toContain('B · 보행난이도');
+    expect(html).toContain('양호 50% · 주의 37.5% · 위험 12.5%');
+    expect(html).toContain('보행약자 기준: 3.18° 이하 양호, 4.76° 이하 주의');
+    expect(html).toContain('평균 경사 3.9° · 최대 9°');
+    expect(html).not.toContain('%)');
+    // A 축에는 구간 비율 문구가 붙지 않는다
+    expect(html.match(/경로 경사 구간 비율/g)).toHaveLength(1);
   });
 
   it('점수 가이드: 설계 파라미터 안내와 급경사지 미포함을 밝힌다', () => {

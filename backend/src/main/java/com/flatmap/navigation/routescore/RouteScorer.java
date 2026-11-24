@@ -1,6 +1,7 @@
 package com.flatmap.navigation.routescore;
 
 import com.flatmap.navigation.dto.WeatherInfo;
+import com.flatmap.navigation.walk.WalkAssessment;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -14,7 +15,9 @@ import java.util.Map;
  * <p>A축(야간 시설 노출) = 구간 함수( 가중 시설 수 ÷ 경로 길이(km) ).
  * C축(날씨 보정) = 100 ÷ 날씨 보정 계수 — 실제 기상 값이 있을 때만 반영한다.
  * 기상 API 실패로 대체값(fallback)이 온 경우에는 C축을 넣지 않는다(0점이나 100점으로 채우지 않는다).
- * 총점은 반영된 축 점수의 가중 평균이다. B축(보행난이도)은 아직 없다.
+ * B축(보행난이도) = 경로 경사 샘플의 양호/주의/위험 비율에서 나온 점수 — 경사 격자에 값이 충분할 때만 반영한다
+ * (평가가 없으면 B축은 breakdown 에 넣지 않는다).
+ * 총점은 반영된 축 점수의 가중 평균이다.
  * 이 점수는 설계 파라미터에서 나온 상대 비교 값이고 과학적 위험도·안전도가 아니다.
  */
 @Component
@@ -22,6 +25,9 @@ public class RouteScorer {
 
     public static final String AXIS_A = "A";
     public static final String AXIS_A_NAME = "야간 시설 노출";
+
+    public static final String AXIS_B = "B";
+    public static final String AXIS_B_NAME = "보행난이도";
 
     public static final String AXIS_C = "C";
     public static final String AXIS_C_NAME = "날씨 보정";
@@ -41,8 +47,16 @@ public class RouteScorer {
 
     /** weather 가 null 이거나 fallback 이면 C축 없이 A축만 반영한다. */
     public RouteScore score(RouteExposure exposure, WeatherInfo weather) {
+        return score(exposure, weather, null);
+    }
+
+    /** walk 가 null 이면(경사 데이터 없음) B축 없이 계산한다. */
+    public RouteScore score(RouteExposure exposure, WeatherInfo weather, WalkAssessment walk) {
         List<AxisScore> axes = new ArrayList<>();
         axes.add(axisA(exposure));
+        if (walk != null) {
+            axes.add(axisB(walk));
+        }
         if (weather != null && !weather.isFallback()) {
             axes.add(axisC(weather));
         }
@@ -71,6 +85,10 @@ public class RouteScorer {
         detail.put("radiusMeters", model.radiusMeters());
         detail.put("policeRadiusMeters", model.policeRadiusMeters());
         return new AxisScore(AXIS_A, AXIS_A_NAME, score, model.axisWeightA(), detail);
+    }
+
+    AxisScore axisB(WalkAssessment w) {
+        return new AxisScore(AXIS_B, AXIS_B_NAME, w.score(), model.axisWeightB(), w.detail());
     }
 
     AxisScore axisC(WeatherInfo w) {

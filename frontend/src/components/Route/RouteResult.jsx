@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { getLevelStyle } from '../../utils/scoreLevel';
+import { describeWalkDetail } from '../../utils/walkMode';
 
-function Breakdown({ breakdown }) {
+export function Breakdown({ breakdown }) {
   if (!breakdown || !breakdown.length) return null;
   return (
     <div className="score-breakdown">
       <div className="score-breakdown-title">점수 내역 (축별 점수 × 가중치의 평균)</div>
-      {breakdown.map((axis) => (
+      {breakdown.map((axis) => {
+        const walk = axis.axis === 'B' ? describeWalkDetail(axis.detail) : null;
+        return (
         <div key={axis.axis} className="score-breakdown-row">
           <span className="score-breakdown-name">{axis.axis} · {axis.name}</span>
           <span className="score-breakdown-bar" aria-hidden="true">
@@ -14,8 +17,16 @@ function Breakdown({ breakdown }) {
           </span>
           <span className="score-breakdown-score">{axis.score.toFixed(1)}점</span>
           <span className="score-breakdown-weight">가중치 {axis.weight}</span>
+          {walk && (
+            <p className="score-breakdown-extra">
+              경로 경사 구간 비율: {walk.ratios}<br />
+              {walk.criteria}<br />
+              {walk.slopes} · 점수가 높을수록 오르막 부담이 작습니다.
+            </p>
+          )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

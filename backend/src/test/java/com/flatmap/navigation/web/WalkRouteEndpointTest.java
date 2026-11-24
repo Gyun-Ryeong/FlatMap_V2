@@ -102,6 +102,70 @@ class WalkRouteEndpointTest {
             {"originLat":37.4,"originLng":127.10,"destLat":37.4,"destLng":127.12,"option":"SAFE",
              "avoidPoints":[{"lat":37.4009,"lng":127.11,"nearestRouteIdx":20}]}""";
 
+    // ---- 보행 유형(B축) ----
+
+    /** 원경로(위도 37.4000, 경도 127.100~127.120)가 지나는 행 252 의 열 210~295 를 같은 경사로 채운다. */
+    private void insertSlopeAlongOriginalRoute(double slopeDeg) {
+        for (int i = 210; i <= 295; i++) {
+            jdbc.update("INSERT INTO walk_slope_cell (cell_i, cell_j, slope_deg) VALUES (?, 252, ?)", i, slopeDeg);
+        }
+    }
+
+    private static String withWalkMode(String body, String mode) {
+        return body.replace("\"option\"", "\"walkMode\":\"" + mode + "\",\"option\"");
+    }
+
+    @Test
+    void walkModeInTheRequestChangesTheBAxisAndTheTotal() throws Exception {
+        insertSlopeAlongOriginalRoute(4.0);        // 일반: 양호 / 보행약자: 주의
+        tmapReturns(eastRoute(ROUTE_LAT, 1800), null);
+        try {
+            mvc.perform(post("/api/route/walk").contentType(MediaType.APPLICATION_JSON)
+                            .content(withWalkMode(WALK_BODY, "WEAK")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.breakdown.length()").value(2))
+                    .andExpect(jsonPath("$.breakdown[1].axis").value("B"))
+                    .andExpect(jsonPath("$.breakdown[1].detail.mode").value("WEAK"))
+                    .andExpect(jsonPath("$.breakdown[1].score").value(50.0));
+            // 모드를 안 주면 기본값 GENERAL
+            mvc.perform(post("/api/route/walk").contentType(MediaType.APPLICATION_JSON).content(WALK_BODY))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.breakdown[1].detail.mode").value("GENERAL"))
+                    .andExpect(jsonPath("$.breakdown[1].score").value(100.0));
+        } finally {
+            jdbc.update("DELETE FROM walk_slope_cell");
+        }
+    }
+
+    @Test
+    void unknownWalkModeIs400WithoutCallingTheRouteProvider() throws Exception {
+        mvc.perform(post("/api/route/walk").contentType(MediaType.APPLICATION_JSON)
+                        .content(withWalkMode(WALK_BODY, "turbo")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_WALK_MODE"));
+        mvc.perform(post("/api/route/walk/detour").contentType(MediaType.APPLICATION_JSON)
+                        .content(withWalkMode(DETOUR_BODY, "turbo")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_WALK_MODE"));
+        Mockito.verifyNoInteractions(tmap);
+    }
+
+    @Test
+    void detourEvaluatesBothRoutesWithTheRequestedWalkMode() throws Exception {
+        insertSteepSlope(ROUTE_LAT + 0.0009, 127.1100);
+        insertSlopeAlongOriginalRoute(4.0);        // 원경로는 격자 안, 우회 경로(남쪽 400m)는 격자 밖이다
+        tmapReturns(eastRoute(ROUTE_LAT, 1800), eastRoute(DETOUR_LAT, 2300));
+        try {
+            mvc.perform(post("/api/route/walk/detour").contentType(MediaType.APPLICATION_JSON)
+                            .content(withWalkMode(DETOUR_BODY, "WEAK")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.originalTotalScore").isNumber())
+                    .andExpect(jsonPath("$.totalScore").isNumber());
+        } finally {
+            jdbc.update("DELETE FROM walk_slope_cell");
+        }
+    }
+
     // ---- /walk ----
 
     @Test

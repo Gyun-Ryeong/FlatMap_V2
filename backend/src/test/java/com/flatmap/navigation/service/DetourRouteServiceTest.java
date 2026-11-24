@@ -102,7 +102,7 @@ class DetourRouteServiceTest {
         doAnswer(inv -> {
             List<double[]> pts = inv.getArgument(0);
             return pts.get(0)[0] > 37.399 ? eval(originalTotal) : eval(detourTotal);
-        }).when(safeRoute).evaluate(anyList());
+        }).when(safeRoute).evaluate(anyList(), any());
     }
 
     @Test
@@ -133,7 +133,7 @@ class DetourRouteServiceTest {
         assertThat(r.getBreakdown()).isNotEmpty();                 // 원경로에도 breakdown 이 있다
         assertThat(r.getTotalScore()).isEqualTo(60.0);
         // 점수 비교까지 가지 않는다 — 원경로 한 번만 평가하고 우회 경로의 시설 집계 쿼리는 아낀다
-        verify(safeRoute, times(1)).evaluate(anyList());
+        verify(safeRoute, times(1)).evaluate(anyList(), any());
     }
 
     @Test

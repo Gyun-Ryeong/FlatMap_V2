@@ -8,6 +8,8 @@ public class DetourRequest {
     private double destLng;
     private double destLat;
     private String option;
+    /** 보행 유형(GENERAL/WEAK). 없으면 서버 기본값. */
+    private String walkMode;
     private List<RiskCoord> avoidPoints;
 
     public double getOriginLng() { return originLng; }
@@ -18,6 +20,8 @@ public class DetourRequest {
     public void setDestLng(double destLng) { this.destLng = destLng; }
     public double getDestLat() { return destLat; }
     public void setDestLat(double destLat) { this.destLat = destLat; }
+    public String getWalkMode() { return walkMode; }
+    public void setWalkMode(String walkMode) { this.walkMode = walkMode; }
     public String getOption() { return option; }
     public void setOption(String option) { this.option = option; }
     public List<RiskCoord> getAvoidPoints() { return avoidPoints; }

@@ -7,12 +7,12 @@ export default function useRoute() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchRoutes = useCallback(async (origin, destination) => {
+  const fetchRoutes = useCallback(async (origin, destination, walkMode) => {
     setLoading(true);
     setError(null);
     setRoutes([]);
     try {
-      const data = await fetchSafeRoutes(origin, destination);
+      const data = await fetchSafeRoutes(origin, destination, walkMode);
       if (!data.routes || data.routes.length === 0) {
         setError('경로를 찾을 수 없습니다.');
       } else {

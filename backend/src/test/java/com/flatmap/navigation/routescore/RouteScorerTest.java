@@ -11,7 +11,7 @@ class RouteScorerTest {
 
     private static ScoreModel model(double policeWeight, double axisWeightA) {
         return new ScoreModel(7, new FacilityWeights(1, 1, policeWeight), 50, 300, 0.1,
-                PiecewiseScale.parse("0:0,2:20,5:40,10:60,20:80,40:100"), axisWeightA, 0.25);
+                PiecewiseScale.parse("0:0,2:20,5:40,10:60,20:80,40:100"), axisWeightA, 1.0, 0.25);
     }
 
     private static final WeatherCorrection CORRECTION = new WeatherCorrection(1.8, 1.6, 1.4, 1.6, 1.2, 0, 10);
@@ -137,7 +137,7 @@ class RouteScorerTest {
     @Test
     void cWeightMustBePositive() {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ScoreModel(1, new FacilityWeights(1, 1, 5), 50, 300,
-                0.1, PiecewiseScale.parse("0:0,40:100"), 1.0, 0))
+                0.1, PiecewiseScale.parse("0:0,40:100"), 1.0, 1.0, 0))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }
