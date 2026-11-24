@@ -42,10 +42,6 @@ public class PublicDataService {
     private final WelfareFacilityRepository welfareFacilityRepository;
     private final ShadeShelterRepository shadeShelterRepository;
     private final SeniorCenterRepository seniorCenterRepository;
-    private final SafetyFacilityRepository safetyFacilityRepository;
-
-    /** safety_facility.data_source 값 (ASCII 고정) */
-    static final String CCTV_SOURCE = "GYEONGGI_DATADREAM_CCTV";
 
     @Value("${public-data.api-key}")
     private String publicDataApiKey;
@@ -56,8 +52,7 @@ public class PublicDataService {
                              ProtectedZoneRepository protectedZoneRepository,
                              WelfareFacilityRepository welfareFacilityRepository,
                              ShadeShelterRepository shadeShelterRepository,
-                             SeniorCenterRepository seniorCenterRepository,
-                             SafetyFacilityRepository safetyFacilityRepository) {
+                             SeniorCenterRepository seniorCenterRepository) {
         this.restTemplate = restTemplate;
         this.apiKeyConfig = apiKeyConfig;
         this.objectMapper = objectMapper;
@@ -66,7 +61,6 @@ public class PublicDataService {
         this.welfareFacilityRepository = welfareFacilityRepository;
         this.shadeShelterRepository = shadeShelterRepository;
         this.seniorCenterRepository = seniorCenterRepository;
-        this.safetyFacilityRepository = safetyFacilityRepository;
     }
 
     // ============================================================
@@ -418,107 +412,7 @@ public class PublicDataService {
         return new SeniorCenter(name, coords[0], coords[1], address, phone, regionCode);
     }
 
-    // ============================================================
-    // 2-5. CCTV 위치 (경기데이터드림 openapi.gg.go.kr/CCTV)
-    // ============================================================
-
-    public int fetchAndSaveCctvLocations() {
-        log.info("=== 경기도 성남시 CCTV 데이터 수집 시작 (경기데이터드림 CCTV) ===");
-
-        List<com.flatmap.navigation.model.SafetyFacility> cctvs = new ArrayList<>();
-        int page = 1;
-
-        while (true) {
-            String url = String.format("https://openapi.gg.go.kr/CCTV?KEY=%s&Type=json&pIndex=%d&pSize=1000",
-                    apiKeyConfig.getGyeonggiApiKey(), page);
-            log.info("[CCTV] API 호출: {}", url.replace(apiKeyConfig.getGyeonggiApiKey(), "***"));
-
-            try {
-                org.springframework.http.client.SimpleClientHttpRequestFactory rf =
-                        new org.springframework.http.client.SimpleClientHttpRequestFactory();
-                rf.setConnectTimeout(8000);
-                rf.setReadTimeout(8000);
-                RestTemplate ggRt = new RestTemplate(rf);
-
-                String raw = ggRt.getForObject(url, String.class);
-                if (raw == null || raw.trim().startsWith("<")) break;
-
-                log.info("[CCTV] 응답 앞 400자: {}", raw.substring(0, Math.min(raw.length(), 400)));
-
-                JsonNode root = objectMapper.readTree(raw);
-                // 경기 API 구조: {"CCTV":[{head},{row:[...]}]}
-                JsonNode rows = findGgRows(root);
-                if (rows == null || rows.isEmpty()) break;
-
-                if (page == 1) log.info("[CCTV] 첫 row: {}", rows.get(0));
-
-                for (JsonNode row : rows) {
-                    com.flatmap.navigation.model.SafetyFacility c = parseCctvLocationGg(row);
-                    if (c != null) cctvs.add(c);
-                }
-                log.info("[CCTV] page={} {}건 조회, 성남시 {}건 누적", page, rows.size(), cctvs.size());
-                if (rows.size() < 1000) break;
-                page++;
-            } catch (Exception e) {
-                log.error("[CCTV] API 호출 실패: {}", e.getMessage());
-                break;
-            }
-        }
-
-        if (!cctvs.isEmpty()) {
-            int inserted = safetyFacilityRepository.replaceAll(
-                    com.flatmap.navigation.model.SafetyFacility.TYPE_CCTV, CCTV_SOURCE, cctvs);
-            log.info("CCTV 성남시 {}건 조회, {}건 저장 (중복 좌표 제외)", cctvs.size(), inserted);
-            return inserted;
-        }
-        log.warn("CCTV 수집 결과 없음");
-        return 0;
-    }
-
-    private com.flatmap.navigation.model.SafetyFacility parseCctvLocationGg(JsonNode row) {
-        // API에 SIGUN_CD 필드 없음 — 주소로 성남시 필터
-        String addr = getFieldValue(row, "REFINE_ROADNM_ADDR", "REFINE_LOTNO_ADDR");
-        String instNm = getFieldValue(row, "MANAGE_INST_NM");
-        boolean isSeongnam = (addr != null && addr.contains("성남시"))
-                || (instNm != null && instNm.contains("성남"));
-        if (!isSeongnam) return null;
-
-        Double lat = getFieldDoubleLocal(row, "REFINE_WGS84_LAT", "LAT");
-        Double lng = getFieldDoubleLocal(row, "REFINE_WGS84_LOGT", "LOGT", "LNG");
-        if (lat == null || lng == null) return null;
-
-        String name = getFieldValue(row, "INSTL_PUPRS_DIV_NM", "CCTV_INSTL_PURPS_NM", "MANAGE_INST_NM");
-        if (name == null) name = "CCTV";
-
-        return new com.flatmap.navigation.model.SafetyFacility(
-                com.flatmap.navigation.model.SafetyFacility.TYPE_CCTV, name, addr, null, lat, lng, CCTV_SOURCE);
-    }
-
-    /** 경기 API JSON 구조에서 row 배열 추출 */
-    private JsonNode findGgRows(JsonNode root) {
-        var names = root.fieldNames();
-        while (names.hasNext()) {
-            JsonNode svc = root.path(names.next());
-            if (svc.isArray() && svc.size() > 1) {
-                JsonNode rows = svc.get(1).path("row");
-                if (rows.isArray() && !rows.isEmpty()) return rows;
-            }
-        }
-        return null;
-    }
-
-    private Double getFieldDoubleLocal(JsonNode row, String... fieldNames) {
-        for (String name : fieldNames) {
-            JsonNode node = row.path(name);
-            if (!node.isMissingNode() && !node.isNull()) {
-                String val = node.asText().trim();
-                if (!val.isEmpty()) {
-                    try { return Double.parseDouble(val); } catch (NumberFormatException ignored) {}
-                }
-            }
-        }
-        return null;
-    }
+    // CCTV 수집(경기데이터드림 CCTV, odcloud 성남시 생활안전 CCTV)은 ingestion 패키지로 옮겼다 — 01 단계.
 
     // ============================================================
     // 공통 API 호출

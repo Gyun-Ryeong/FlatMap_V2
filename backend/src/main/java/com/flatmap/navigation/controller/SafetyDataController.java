@@ -2,12 +2,16 @@ package com.flatmap.navigation.controller;
 
 import com.flatmap.navigation.config.ApiErrors;
 import com.flatmap.navigation.entity.*;
+import com.flatmap.navigation.ingestion.FacilityIngestionService;
+import com.flatmap.navigation.ingestion.FacilitySource;
+import com.flatmap.navigation.ingestion.SourceResult;
 import com.flatmap.navigation.model.SafetyFacility;
 import com.flatmap.navigation.repository.*;
 import com.flatmap.navigation.service.GyeonggiDataService;
 import com.flatmap.navigation.service.PublicDataService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,6 +37,7 @@ public class SafetyDataController {
     private final SeniorCenterRepository seniorCenterRepository;
     private final GyeonggiDataService gyeonggiDataService;
     private final PublicDataService publicDataService;
+    private final FacilityIngestionService facilityIngestionService;
 
     public SafetyDataController(SafetyFacilityRepository safetyFacilityRepository,
                                 AccidentZoneRepository accidentZoneRepository,
@@ -41,7 +46,9 @@ public class SafetyDataController {
                                 ShadeShelterRepository shadeShelterRepository,
                                 SeniorCenterRepository seniorCenterRepository,
                                 GyeonggiDataService gyeonggiDataService,
-                                PublicDataService publicDataService) {
+                                PublicDataService publicDataService,
+                                FacilityIngestionService facilityIngestionService) {
+        this.facilityIngestionService = facilityIngestionService;
         this.safetyFacilityRepository = safetyFacilityRepository;
         this.accidentZoneRepository = accidentZoneRepository;
         this.protectedZoneRepository = protectedZoneRepository;
@@ -143,16 +150,19 @@ public class SafetyDataController {
 
     // ========== 관리용: 실제 API 데이터 수집 ==========
 
-    @PostMapping("/fetch/security-lights")
-    public ResponseEntity<Map<String, Object>> fetchSecurityLights() {
-        log.info("보안등 실제 데이터 수집 시작");
-        try {
-            int saved = gyeonggiDataService.fetchAndSaveSecurityLights();
-            return ResponseEntity.ok(Map.of("savedCount", saved, "message", "보안등 데이터 수집 완료"));
-        } catch (Exception e) {
-            log.error("보안등 데이터 수집 실패: {}", e.getMessage(), e);
-            return ApiErrors.internal();
+    /**
+     * CCTV·보안등·경찰시설(safety_facility) 수집. 소스별 성공/실패와 건수만 응답한다(실패 원인은 서버 로그).
+     * source 를 주면 그 소스만, 없으면 전체. 같은 호출을 반복해도 결과 행 수는 늘지 않는다(멱등).
+     */
+    @PostMapping("/facilities/sync")
+    public ResponseEntity<Map<String, Object>> syncFacilities(@RequestParam(required = false) String source) {
+        if (source == null || source.isBlank()) {
+            return ResponseEntity.ok(Map.of("results", facilityIngestionService.syncAll()));
         }
+        return FacilitySource.fromCode(source)
+                .<ResponseEntity<Map<String, Object>>>map(s ->
+                        ResponseEntity.ok(Map.of("results", List.of(facilityIngestionService.sync(s)))))
+                .orElseGet(() -> ApiErrors.body(HttpStatus.BAD_REQUEST, "UNKNOWN_SOURCE", "알 수 없는 수집 소스입니다."));
     }
 
     @PostMapping("/fetch/accident-zones")
@@ -215,18 +225,6 @@ public class SafetyDataController {
         }
     }
 
-    @PostMapping("/fetch/cctv")
-    public ResponseEntity<Map<String, Object>> fetchCctv() {
-        log.info("CCTV 실제 데이터 수집 시작");
-        try {
-            int saved = publicDataService.fetchAndSaveCctvLocations();
-            return ResponseEntity.ok(Map.of("savedCount", saved, "message", "CCTV 데이터 수집 완료"));
-        } catch (Exception e) {
-            log.error("CCTV 수집 실패: {}", e.getMessage(), e);
-            return ApiErrors.internal();
-        }
-    }
-
     /** 전체 안전 데이터 수집. 실패한 항목은 이름만 failedSources 로 알린다(원인은 서버 로그에만). */
     @PostMapping("/fetch/all")
     public ResponseEntity<Map<String, Object>> fetchAllSafetyData() {
@@ -234,13 +232,14 @@ public class SafetyDataController {
         Map<String, Object> result = new java.util.HashMap<>();
         List<String> failedSources = new ArrayList<>();
 
-        result.put("securityLights", safeFetch("보안등", () -> gyeonggiDataService.fetchAndSaveSecurityLights(), failedSources));
+        List<SourceResult> facilities = facilityIngestionService.syncAll();
+        result.put("facilities", facilities);
+        facilities.stream().filter(r -> !r.isSuccess()).forEach(r -> failedSources.add(r.source()));
         result.put("accidentZones", safeFetch("사고다발지", () -> gyeonggiDataService.fetchAndSaveAccidentZones(), failedSources));
         result.put("protectedZones", safeFetch("교통약자보호구역", () -> publicDataService.fetchAndSaveProtectedZones(), failedSources));
         result.put("welfareFacilities", safeFetch("장애인복지시설", () -> publicDataService.fetchAndSaveWelfareFacilities(), failedSources));
         result.put("shadeShelters", safeFetch("그늘막", () -> publicDataService.fetchAndSaveShadeShelters(), failedSources));
         result.put("seniorCenters", safeFetch("노인복지관+경로당", () -> gyeonggiDataService.fetchAndSaveSeniorCenters(), failedSources));
-        result.put("cctv", safeFetch("CCTV", () -> publicDataService.fetchAndSaveCctvLocations(), failedSources));
 
         if (!failedSources.isEmpty()) result.put("failedSources", failedSources);
         return ResponseEntity.ok(result);

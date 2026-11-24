@@ -1,5 +1,81 @@
 # CHANGELOG
 
+> 단계 번호: 아래 "1단계 — 통합 스키마…" 는 로드맵의 00(foundation) 이다. 로드맵 01(ingestion)은 이 문서 맨 위 항목이다.
+
+## 01 단계 — 성남시 안전시설 재수집 (ingestion) (2026-11-10) — 구현·자동 테스트 완료, 실제 적재 검증 4/6 소스
+
+깨진 덤프를 쓰지 않고 공공 소스에서 CCTV·보안등·경찰시설을 다시 수집해 `safety_facility` 에 적재한다.
+
+### 실제 적재 검증 결과 (flatmapv2 DB, 2026-11-10)
+
+| 소스 | 결과 | 적재 |
+|------|------|------|
+| `GG_CCTV` | 성공, 2회차 inserted 0 | 2,896 (83,072행 중 성남) |
+| `GG_POLICE` | 성공, 2회차 inserted 0, 소방서 36건 제외 | 33 (469행 중) |
+| `ODCLOUD_ILLUMINATION` | 성공, 2회차 inserted 0 | 3,133 (177건은 중복 좌표) |
+| `SEONGNAM_CSV` | 성공, 2회차 inserted 0 | 9,606 (283,264행 중) |
+| `ODCLOUD_SEONGNAM_CCTV` | **실패 — API 가 HTTP 401** | 0 (키에 데이터셋 15147955 활용신청 권한이 없는 것으로 보임, 코드 문제 아님) |
+| `GG_SECURITY_LIGHT` | **미확인** — 297,198건·298페이지를 한 요청에서 읽는데 29분 넘게 끝나지 않아 중단(커밋 전이라 DB 변경 없음) | 0 |
+
+검증 SQL: 4개 소스에서 `bad_pct` 0%, 중복 자연키 0건, 성남 밖 0건, 주소에 "성남" 없음 0건(조도 제외), 옛 `GYEONGGI_DATADREAM_*` 코드 0건.
+**이 문서의 위 두 소스(`ODCLOUD_SEONGNAM_CCTV`, `GG_SECURITY_LIGHT`)는 아직 검증되지 않았다.**
+
+### 후속 작업
+
+- `ODCLOUD_SEONGNAM_CCTV`: 공공데이터포털에서 15147955 활용신청 후 재동기화(사용자 작업).
+- `GG_SECURITY_LIGHT`: 동기 호출 한 번에 30분 이상 걸린다. 수집을 백그라운드로 돌리거나 페이지 단위로 커밋하는 방식 검토 필요. 전체 약 297k건 중 성남 비중은 적을 것으로 보이며, `SEONGNAM_CSV`(9.6k)·`ODCLOUD_ILLUMINATION`(3.1k)이 보안등을 이미 채우고 있다.
+- 로그에 `IOException` 은 이제 HTTP 상태("HTTP 401" 등)까지 남긴다(URL·키는 여전히 남기지 않는다).
+
+### 추가됨
+
+- `ingestion` 패키지: 소스 6개 리더 + `FacilityIngestionService`. `data_source` 코드값은 고정 영문이다.
+
+| 코드값 | 대상 | 소스 |
+|--------|------|------|
+| `GG_CCTV` | CCTV | 경기데이터드림 `CCTV` |
+| `GG_SECURITY_LIGHT` | 보안등 | 경기데이터드림 `SECRTLGT` |
+| `GG_POLICE` | 경찰시설 | 경기데이터드림 `FiresttnPolcsttnM` (XML) |
+| `ODCLOUD_ILLUMINATION` | 보안등 | 공공데이터포털 odcloud 15110584 (조도측정) |
+| `ODCLOUD_SEONGNAM_CCTV` | CCTV | 공공데이터포털 odcloud 15147955 (성남시 생활안전 CCTV) |
+| `SEONGNAM_CSV` | 보안등 | 성남시 보안등 CSV (**CP949**, 경로는 환경변수 `SEONGNAM_SECURITY_LIGHT_CSV_PATH`) |
+
+- `POST /api/safety/facilities/sync[?source=<코드값>]` (관리용, `X-Admin-Api-Key`). 응답은 소스별 `source/status/read/excluded/inserted` 만 담는다. 실패 원인은 서버 로그에만 남고 키·URL 은 로그에도 남기지 않는다.
+- Flyway `V2__rename_legacy_facility_sources.sql`: 옛 `data_source` 값(`GYEONGGI_DATADREAM_SECRTLGT/CCTV`)을 새 코드값으로 이름만 바꾼다(삭제 없음).
+- `.env.example`: `SEONGNAM_SECURITY_LIGHT_CSV_PATH` 키 이름 추가.
+
+### 동작
+
+- **성남 필터(전 소스 공통)**: 좌표 범위(위도 37.33~37.53, 경도 127.04~127.20) **그리고** 주소에 "성남". 조도측정(`ODCLOUD_ILLUMINATION`)은 원본에 주소 컬럼이 없어 좌표 범위만 적용한다(주소가 실려 오면 성남이어야 한다).
+- **경찰시설**: 경찰서/지구대/파출소/치안센터만 남긴다. 소방(`소방`, `119` 포함)은 제외하고 제외 건수를 로그에 남긴다. 그 밖의 시설도 제외한다.
+- **멱등**: `INSERT ... ON CONFLICT (facility_type, location) DO NOTHING`. 같은 좌표를 다른 소스가 가지면 먼저 들어간 행이 유지된다. 옛 `replaceAll`(삭제 후 삽입)은 이 경로에서 쓰지 않는다.
+- **품질 게이트**: 소스별로 name/address 가 비었거나 `?` 만 있거나 깨진 문자(U+FFFD)가 든 행이 5% 를 넘으면 그 소스는 실패 처리하고 롤백한다(후보 단계 + 적재 후 DB 단계 모두 검사). 소스 하나가 실패해도 나머지는 진행한다.
+- 외부 호출은 연결 10초·읽기 30초 타임아웃, 페이지 사이 300ms 지연, 응답은 UTF-8 로 고정해 해석한다. 서비스 키는 URL 인코딩한다.
+- CSV 는 헤더 이름으로 컬럼을 찾는다. UTF-8 파일을 CP949 로 잘못 읽으면 헤더가 맞지 않아 실패한다(깨진 한글을 적재하지 않는다).
+
+### 변경됨 / 제거됨
+
+- `GyeonggiDataService.fetchAndSaveSecurityLights`, `PublicDataService.fetchAndSaveCctvLocations` 삭제(새 수집으로 통합). 기존 보안등 수집은 첫 100건만 읽던 버그가 있었다.
+- `POST /api/safety/fetch/security-lights`, `POST /api/safety/fetch/cctv` 삭제 → `POST /api/safety/facilities/sync` 로 대체.
+- `POST /api/safety/fetch/all`, `POST /api/data/fetch/all` 은 시설 수집 결과를 `facilities`(소스별 배열)로 돌려주고, 실패한 시설 소스는 `failedSources` 에 코드값으로 나타난다. 기존 `securityLights`, `cctv` 필드는 없어졌다.
+
+### 테스트
+
+기존 81개 중 `AdminEndpointSecurityTest` 는 삭제한 엔드포인트 2개를 빼고 새 엔드포인트 1개를 더해(엔드포인트당 3케이스) 59 → 56개가 되었다. `ErrorResponseTest` 는 같은 목적(실패 원인 비노출)으로 대상 소스만 바꿨다.
+
+| 클래스 | 검증 내용 |
+|--------|----------|
+| `FacilityIngestionServiceTest` (9) | 2회 실행해도 행 수 불변, 소스 간 같은 좌표는 먼저 들어간 행 유지, CP949 한글 저장 왕복, 깨진 후보 거부, 적재 후 검사 실패 시 롤백, 한 소스 실패해도 나머지 진행, 빈 결과는 실패, 주소 없는 소스는 주소로 감점하지 않음, SQL/Java 불량 기준 일치 |
+| `FacilitySyncEndpointTest` (4) | 응답 필드 5개뿐·내부 메시지 비노출, 2회차 inserted 0, 알 수 없는 소스 400(입력 미반사), 키 없으면 401·외부 호출 없음 |
+| `GyeonggiJsonReaderTest` (7) · `PoliceXmlReaderTest` (6) · `OdcloudReaderTest` (6) · `SeongnamCsvReaderTest` (5) · `TextQualityTest` (16) | 성남 밖 제외·사유별 건수, 소방서 제외, 페이징, 오류 코드, 키 누락, XXE 차단, CP949, UTF-8 오입력 거부 |
+| `AdminEndpointSecurityTest` | `/api/safety/facilities/sync` 를 관리용 목록에 추가(키 없음 401 / 틀린 키 401 / 일반 사용자 403) |
+
+결과: **131개 통과**(기존 `81` → 새 테스트 `+53`, 삭제된 파라미터 케이스 `-3`).
+
+### 알려진 한계
+
+- `GG_CCTV`·`GG_POLICE`·`ODCLOUD_ILLUMINATION` 의 실제 응답 필드명은 레거시 기준으로 맞았다(0% 불량). `GG_SECURITY_LIGHT` 의 필드명은 아직 확인되지 않았다. 경찰시설 이름(`INST_NM`)은 `고등`, `구미`처럼 시설 종류 없이 지명만 있다(UI 표기 시 참고).
+- 레거시 CSV 적재 결과: 283,264행 중 성남 9,607행이 통과했고 9,606건이 적재됐다(1건은 중복 좌표). **이 중 이름의 84%(8,087건)와 주소의 3.8%(368건)에 문자 중간 `?` 가 들어 있다**(예: `제일로98번길4 ?TS?`). 변환 실패 문자는 0건이므로 디코딩 문제가 아니라 원본 파일에 이미 들어 있는 값이다. 5% 규칙은 "`?` 만 있는 값"을 기준으로 하므로 이를 잡지 않는다. 이름은 보안등 식별 라벨이고 거리 계산에는 쓰이지 않는다.
+
 ## 1단계 — 통합 스키마 구조 + 인프라 + 보안 정리 (2026-11-07)
 
 기능 이식과 데이터 적재는 하지 않았다. 구조(스키마), 실행 환경, 보안만 정리했다.

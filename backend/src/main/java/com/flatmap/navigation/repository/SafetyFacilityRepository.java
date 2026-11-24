@@ -77,6 +77,25 @@ public class SafetyFacilityRepository {
         return n == null ? 0 : n;
     }
 
+    public long countByDataSource(String dataSource) {
+        Long n = jdbc.queryForObject("SELECT COUNT(*) FROM safety_facility WHERE data_source = ?",
+                Long.class, dataSource);
+        return n == null ? 0 : n;
+    }
+
+    /**
+     * 한 출처(data_source)의 전체 행 수와 "나쁜 값" 행 수 — {전체, 나쁜 행}.
+     * 나쁜 값 기준은 TextQuality 와 같다: NULL/공백/'?'만/U+FFFD 포함. checkAddress 가 false 면 name 만 본다.
+     */
+    public long[] badTextCounts(String dataSource, boolean checkAddress) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*), COUNT(*) FILTER (WHERE " +
+                "name IS NULL OR name ~ '^\\s*\\?*\\s*$' OR position(chr(65533) in name) > 0 " +
+                "OR (?::boolean AND (address IS NULL OR address ~ '^\\s*\\?*\\s*$' OR position(chr(65533) in address) > 0))) " +
+                "FROM safety_facility WHERE data_source = ?",
+                (rs, i) -> new long[]{rs.getLong(1), rs.getLong(2)}, checkAddress, dataSource);
+    }
+
     /**
      * 같은 (종류, 출처) 행을 지우고 새로 적재한다. 같은 (종류, 좌표)가 이미 있으면 건너뛴다(ON CONFLICT DO NOTHING).
      *

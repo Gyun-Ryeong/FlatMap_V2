@@ -1,5 +1,7 @@
 package com.flatmap.navigation.controller;
 
+import com.flatmap.navigation.ingestion.FacilityIngestionService;
+import com.flatmap.navigation.ingestion.SourceResult;
 import com.flatmap.navigation.service.DisasterDataService;
 import com.flatmap.navigation.service.GyeonggiDataService;
 import com.flatmap.navigation.service.PublicDataService;
@@ -28,10 +30,13 @@ public class DataFetchController {
     private final GyeonggiDataService gyeonggiDataService;
     private final DisasterDataService disasterDataService;
     private final PublicDataService publicDataService;
+    private final FacilityIngestionService facilityIngestionService;
 
     public DataFetchController(GyeonggiDataService gyeonggiDataService,
                                 DisasterDataService disasterDataService,
-                                PublicDataService publicDataService) {
+                                PublicDataService publicDataService,
+                                FacilityIngestionService facilityIngestionService) {
+        this.facilityIngestionService = facilityIngestionService;
         this.gyeonggiDataService = gyeonggiDataService;
         this.disasterDataService = disasterDataService;
         this.publicDataService = publicDataService;
@@ -57,8 +62,9 @@ public class DataFetchController {
                 publicDataService::fetchAndSaveSteepSlopes, failedSources));
 
         // === 안전시설 데이터 ===
-        result.put("securityLights", safeFetch("보안등",
-                gyeonggiDataService::fetchAndSaveSecurityLights, failedSources));
+        List<SourceResult> facilities = facilityIngestionService.syncAll();
+        result.put("facilities", facilities);
+        facilities.stream().filter(r -> !r.isSuccess()).forEach(r -> failedSources.add(r.source()));
         result.put("accidentZones", safeFetch("사고다발지",
                 gyeonggiDataService::fetchAndSaveAccidentZones, failedSources));
 
@@ -71,8 +77,6 @@ public class DataFetchController {
                 publicDataService::fetchAndSaveShadeShelters, failedSources));
         result.put("seniorCenters", safeFetch("노인복지관",
                 publicDataService::fetchAndSaveSeniorCenters, failedSources));
-        result.put("cctv", safeFetch("CCTV",
-                publicDataService::fetchAndSaveCctvLocations, failedSources));
 
         long elapsed = System.currentTimeMillis() - startTime;
         result.put("elapsedMs", elapsed);

@@ -2,6 +2,7 @@ package com.flatmap.navigation.web;
 
 import com.flatmap.navigation.config.AdminApiKeyFilter;
 import com.flatmap.navigation.config.ApiErrors;
+import com.flatmap.navigation.ingestion.FacilityIngestionService;
 import com.flatmap.navigation.service.ElevationService;
 import com.flatmap.navigation.service.GyeonggiDataService;
 import com.flatmap.navigation.service.PublicDataService;
@@ -43,6 +44,10 @@ class ErrorResponseTest {
     @MockBean
     PublicDataService publicDataService;
 
+    /** 시설 수집(01 단계 ingestion)도 외부 API 를 호출하므로 막는다(빈 목록을 돌려준다). */
+    @MockBean
+    FacilityIngestionService facilityIngestionService;
+
     @Test
     void failingControllerReturnsGenericErrorWithoutExceptionMessage() throws Exception {
         when(elevationService.updateGradesFromElevation()).thenThrow(new RuntimeException(LEAKY_DETAIL));
@@ -59,13 +64,13 @@ class ErrorResponseTest {
 
     @Test
     void aggregateFetchReportsOnlyFailedSourceNamesNotCauses() throws Exception {
-        when(gyeonggiDataService.fetchAndSaveSecurityLights()).thenThrow(new RuntimeException(LEAKY_DETAIL));
+        when(gyeonggiDataService.fetchAndSaveAccidentZones()).thenThrow(new RuntimeException(LEAKY_DETAIL));
 
         MvcResult result = mvc.perform(post("/api/safety/fetch/all")
                         .header(AdminApiKeyFilter.HEADER, adminApiKey)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.failedSources[0]").value("보안등"))
+                .andExpect(jsonPath("$.failedSources[0]").value("사고다발지"))
                 .andReturn();
 
         String body = result.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
